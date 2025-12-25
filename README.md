@@ -328,16 +328,9 @@ All thermochemical data and performance calculations are powered by NASA's CEA p
 
 ## References
 
-### NASA CEA References
 1. **NASA CEA Website**: https://cearun.grc.nasa.gov/
 2. **CEA Documentation**: Gordon, S. and McBride, B.J., "Computer Program for Calculation of Complex Chemical Equilibrium Compositions and Applications", NASA Reference Publication 1311, 1994
 3. **RocketCEA Documentation**: http://rocketcea.readthedocs.io/
-
-### Rocket Engine Design References
-4. NASA SP-8109: "Liquid Rocket Engine Nozzles"
-5. NASA SP-8087: "Liquid Rocket Engine Turbopump Inducers"
-6. Huzel & Huang: "Modern Engineering for Design of Liquid-Propellant Rocket Engines"
-7. Sutton & Biblarz: "Rocket Propulsion Elements"
 
 ---
 
