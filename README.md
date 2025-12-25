@@ -1,6 +1,6 @@
-# Rocket Motor Design Plotter
+# SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION
 
-**PROMETHEUS v6.1** - A comprehensive rocket engine design and analysis tool with regenerative cooling simulation
+**SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION v6.2** - A comprehensive rocket engine design and analysis tool with regenerative cooling simulation
 
 ## Overview
 

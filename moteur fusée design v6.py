@@ -21,7 +21,7 @@ except ImportError:
 class RocketApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Rocket Engine Designer v6.1 (PROMETHEUS - Regen Cooling)")
+        self.root.title("SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION v6.2")
         self.root.geometry("1600x1000")
         
         # --- VARIABLES ---
@@ -189,6 +189,7 @@ class RocketApp:
         self.combo_mode = ttk.Combobox(row1, values=["2D (Courbe)", "3D (Surface)"], state="readonly", width=12)
         self.combo_mode.current(0)
         self.combo_mode.pack(side=tk.LEFT, padx=5)
+        self.combo_mode.bind("<<ComboboxSelected>>", self.update_mode_display)
         
         ttk.Label(row1, text="Résolution:").pack(side=tk.LEFT, padx=(15, 0))
         self.spin_res = ttk.Spinbox(row1, from_=5, to=100, width=5)
@@ -222,12 +223,23 @@ class RocketApp:
         self.combo_x.current(1)
         self.combo_x.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(row2, text="Sortie (Y/Z):").pack(side=tk.LEFT, padx=(10, 0))
+        # Axe Y (caché par défaut, visible seulement en 3D)
+        ttk.Label(row2, text="Axe Y (Input):").pack(side=tk.LEFT, padx=(10, 0))
+        self.combo_y = ttk.Combobox(row2, values=self.input_vars, width=22, state="readonly")
+        self.combo_y.current(0)
+        self.combo_y.pack(side=tk.LEFT, padx=5)
+        self.label_y = row2.winfo_children()[-2]  # Référence au label "Axe Y"
+        
+        # Masquer l'axe Y au démarrage (mode 2D par défaut)
+        self.combo_y.pack_forget()
+        self.label_y.pack_forget()
+        
+        ttk.Label(row2, text="Sortie (Z):").pack(side=tk.LEFT, padx=(10, 0))
         self.combo_z = ttk.Combobox(row2, values=self.vars_out, width=22, state="readonly")
         self.combo_z.current(0)
         self.combo_z.pack(side=tk.LEFT, padx=5)
         
-        # Ligne 3 : Ranges
+        # Ligne 3 : Ranges X et Y
         self.f_range = ttk.Frame(ctrl_frame)
         self.f_range.pack(fill=tk.X, pady=2)
         
@@ -240,6 +252,27 @@ class RocketApp:
         self.e_xmax = ttk.Entry(self.f_range, width=6)
         self.e_xmax.insert(0, "4.0")
         self.e_xmax.pack(side=tk.LEFT, padx=2)
+        
+        # Champs Min Y et Max Y (cachés par défaut en mode 2D)
+        ttk.Label(self.f_range, text="Min Y:").pack(side=tk.LEFT, padx=(10, 0))
+        self.e_ymin = ttk.Entry(self.f_range, width=6)
+        self.e_ymin.insert(0, "1.5")
+        self.e_ymin.pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(self.f_range, text="Max Y:").pack(side=tk.LEFT)
+        self.e_ymax = ttk.Entry(self.f_range, width=6)
+        self.e_ymax.insert(0, "4.0")
+        self.e_ymax.pack(side=tk.LEFT, padx=2)
+        
+        # Stocker les labels pour pouvoir les afficher/masquer
+        self.label_ymin = self.f_range.winfo_children()[-4]
+        self.label_ymax = self.f_range.winfo_children()[-2]
+        
+        # Masquer les champs Y au démarrage (mode 2D par défaut)
+        self.label_ymin.pack_forget()
+        self.e_ymin.pack_forget()
+        self.label_ymax.pack_forget()
+        self.e_ymax.pack_forget()
         
         ttk.Button(ctrl_frame, text="CALCULER & TRACER", command=self.plot_manager).pack(side=tk.RIGHT, padx=10, pady=5)
         
@@ -1565,7 +1598,31 @@ Débit Oxydant   : {mdot_ox_available:.4f} kg/s
         # Mettre à jour les combobox
         self.combo_x['values'] = self.input_vars
         self.combo_x.current(0)
+        self.combo_y['values'] = self.input_vars
+        self.combo_y.current(0)
         self.combo_z['values'] = self.vars_out
+        self.combo_z.current(0)
+
+    def update_mode_display(self, event=None):
+        """Affiche/masque l'axe Y selon le mode sélectionné"""
+        mode = self.combo_mode.get()
+        
+        if "3D" in mode:
+            # Afficher l'axe Y et les ranges en mode 3D
+            self.label_y.pack(side=tk.LEFT, padx=(10, 0))
+            self.combo_y.pack(side=tk.LEFT, padx=5)
+            self.label_ymin.pack(side=tk.LEFT, padx=(10, 0))
+            self.e_ymin.pack(side=tk.LEFT, padx=2)
+            self.label_ymax.pack(side=tk.LEFT, padx=(0, 0))
+            self.e_ymax.pack(side=tk.LEFT, padx=2)
+        else:
+            # Masquer l'axe Y et les ranges en mode 2D
+            self.label_y.pack_forget()
+            self.combo_y.pack_forget()
+            self.label_ymin.pack_forget()
+            self.e_ymin.pack_forget()
+            self.label_ymax.pack_forget()
+            self.e_ymax.pack_forget()
         self.combo_z.current(0)
         
         # Mettre à jour les valeurs par défaut des ranges selon la catégorie
@@ -1694,21 +1751,19 @@ Débit Oxydant   : {mdot_ox_available:.4f} kg/s
         try:
             xmin = float(self.e_xmin.get())
             xmax = float(self.e_xmax.get())
+            ymin = float(self.e_ymin.get())
+            ymax = float(self.e_ymax.get())
         except:
             xmin, xmax = 1.0, 4.0
+            ymin, ymax = 1.5, 4.0
         
         mode_x = self.combo_x.get()
+        mode_y = self.combo_y.get()
         var_z = self.combo_z.get()
         
-        # X = variable choisie, Y = O/F ou Pression
+        # Créer les ranges pour X et Y
         X_range = np.linspace(xmin, xmax, steps)
-        
-        if "O/F" in mode_x:
-            Y_range = np.linspace(5, 30, steps)  # Pression
-            y_label = "Pression (bar)"
-        else:
-            Y_range = np.linspace(1.5, 4.0, steps)  # O/F
-            y_label = "O/F Ratio"
+        Y_range = np.linspace(ymin, ymax, steps)
         
         X, Y = np.meshgrid(X_range, Y_range)
         Z = np.zeros_like(X)
@@ -1716,32 +1771,50 @@ Débit Oxydant   : {mdot_ox_available:.4f} kg/s
         pe_def = self.get_val("pe")
         pamb_def = self.get_val("pamb")
         
+        # Mapping des paramètres vers les variables CEA
+        param_map = {
+            "Pression Chambre (bar)": ("pc", float),
+            "O/F Ratio": ("mr", float),
+            "Expansion Ratio (Eps)": ("eps", float),
+            "Contraction Ratio": ("cr", float),
+            "Pression Ambiante (bar)": ("pamb", float),
+            "L* (m)": ("lstar", float),
+        }
+        
         for i in range(steps):
             for j in range(steps):
                 vx = X[i, j]
                 vy = Y[i, j]
                 
-                if "O/F" in mode_x:
-                    mr = vx
-                    pc = vy
-                elif "Pression Chambre" in mode_x:
+                # Initialiser avec les valeurs par défaut
+                pc = self.get_val("pc")
+                mr = self.get_val("mr")
+                eps_ov = 0
+                
+                # Appliquer les valeurs d'entrée selon les axes sélectionnés
+                if "Pression Chambre" in mode_x:
                     pc = vx
+                elif "O/F" in mode_x:
+                    mr = vx
+                elif "Expansion" in mode_x:
+                    eps_ov = vx
+                
+                if "Pression Chambre" in mode_y:
+                    pc = vy
+                elif "O/F" in mode_y:
                     mr = vy
-                else:
-                    pc = self.get_val("pc")
-                    mr = vy
+                elif "Expansion" in mode_y:
+                    eps_ov = vy
                 
                 pc_psi = pc * 14.5038
                 pe_psi = pe_def * 14.5038
                 pamb_psi = pamb_def * 14.5038
                 
-                eps_ov = vx if "Expansion" in mode_x else 0
-                
                 Z[i, j] = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps_ov, pamb_psi, var_z)
         
         surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=True)
         ax.set_xlabel(mode_x.split(" ")[0])
-        ax.set_ylabel(y_label)
+        ax.set_ylabel(mode_y.split(" ")[0])
         ax.set_zlabel(var_z.split(" ")[0])
         self.fig_graph.colorbar(surf, shrink=0.5, aspect=5)
         
