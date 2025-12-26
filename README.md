@@ -394,5 +394,5 @@ All thermochemical data and performance calculations are powered by NASA's CEA p
 ---
 
 **Version**: PROMETHEUS v6.1 (Regen Cooling)  
-**Last Updated**: 2024  
+**Last Updated**: 2025  
 **Author**: Bestsage
