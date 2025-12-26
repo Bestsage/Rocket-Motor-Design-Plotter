@@ -1,6 +1,6 @@
-# SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION
+# SITH MISCHUNG COMBUSTION : Dark Side Edition
 
-**SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION v6.2** - A comprehensive rocket engine design and analysis tool with regenerative cooling simulation
+**SITH MISCHUNG COMBUSTION : Dark Side Edition v6.3** - A comprehensive rocket engine design and analysis tool with regenerative cooling simulation
 
 ## Overview
 
