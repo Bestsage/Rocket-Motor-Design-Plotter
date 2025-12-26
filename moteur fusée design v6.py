@@ -130,6 +130,9 @@ class RocketApp:
         self.tabs.add(self.tab_cea, text="Sortie NASA CEA (Raw)")
         self.tabs.add(self.tab_database, text="🔍 Base de Données")
         
+        # Calculer le zoom AVANT d'initialiser les onglets (pour les polices)
+        self.ui_scale = self.auto_scale_from_display()
+        
         self.create_inputs(left_panel)
         self.init_summary_tab()
         self.init_visu_tab()
@@ -139,7 +142,6 @@ class RocketApp:
         self.init_database_tab()
 
         # Apply UI scaling after layout is ready
-        self.ui_scale = self.auto_scale_from_display()
         self.apply_ui_scale(self.ui_scale)
 
     def auto_scale_from_display(self):
@@ -147,27 +149,70 @@ class RocketApp:
         try:
             width = self.root.winfo_screenwidth()
             height = self.root.winfo_screenheight()
-            # Heuristique simple: 1080p -> 1.0, 1440p -> 1.25, 4K -> 1.5
+            # Heuristique: 1080p -> 1.0, 1440p/2K -> 1.35, 4K -> 1.6
             if width >= 3800 or height >= 2100:
-                return 1.5
+                return 1.6
             if width >= 2500 or height >= 1400:
-                return 1.25
+                return 1.35
             return 1.0
         except Exception:
             return 1.0
 
+    def scaled_font_size(self, base_size: int = 11) -> int:
+        """Retourne une taille de police ajustée selon le zoom."""
+        return max(10, int(base_size * getattr(self, 'ui_scale', 1.0)))
+
     def apply_ui_scale(self, scale: float):
-        """Applique le zoom Tk et agrandit les polices de base."""
+        """Applique le zoom Tk et met à jour les polices."""
+        self.ui_scale = scale
+        
         try:
             self.root.tk.call('tk', 'scaling', scale)
         except tk.TclError:
             pass
-        for fname in ("TkDefaultFont", "TkTextFont", "TkFixedFont", "TkMenuFont", "TkHeadingFont", "TkTooltipFont"):
+        
+        # Utiliser les tailles de base stockées, pas les tailles actuelles
+        if not hasattr(self, '_base_font_sizes'):
+            self._base_font_sizes = {}
+            for fname in ("TkDefaultFont", "TkTextFont", "TkFixedFont", "TkMenuFont", "TkHeadingFont", "TkTooltipFont"):
+                try:
+                    f = tkfont.nametofont(fname)
+                    self._base_font_sizes[fname] = abs(f.cget("size"))
+                except tk.TclError:
+                    self._base_font_sizes[fname] = 10
+        
+        for fname, base_size in self._base_font_sizes.items():
             try:
                 f = tkfont.nametofont(fname)
-                f.configure(size=max(8, int(f.cget("size") * scale)))
+                f.configure(size=max(8, int(base_size * scale)))
             except tk.TclError:
                 continue
+        
+        # Mettre à jour les widgets Text personnalisés
+        self.update_text_widget_fonts()
+
+    def update_text_widget_fonts(self):
+        """Met à jour les polices des widgets Text selon le zoom actuel."""
+        fs = self.scaled_font_size(13)
+        fs_title = self.scaled_font_size(16)
+        
+        # Widget Résumé
+        if hasattr(self, 'txt_summary'):
+            self.txt_summary.configure(font=("Consolas", fs))
+            self.txt_summary.tag_configure("title", font=("Consolas", fs_title, "bold"))
+            self.txt_summary.tag_configure("section", font=("Consolas", fs, "bold"))
+        
+        # Widget CEA
+        if hasattr(self, 'txt_cea'):
+            self.txt_cea.configure(font=("Consolas", fs))
+            self.txt_cea.tag_configure("cea_header", font=("Consolas", fs, "bold"))
+            self.txt_cea.tag_configure("cea_comment", font=("Consolas", fs, "italic"))
+        
+        # Widget Base de données
+        if hasattr(self, 'db_details'):
+            self.db_details.configure(font=("Consolas", fs))
+            self.db_details.tag_configure("db_title", font=("Consolas", fs_title, "bold"))
+            self.db_details.tag_configure("db_section", font=("Consolas", fs, "bold"))
 
     def set_ui_scale_from_control(self):
         val = self.zoom_var.get()
@@ -258,21 +303,170 @@ class RocketApp:
         summary_frame = ttk.Frame(self.tab_summary)
         summary_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        fs = self.scaled_font_size(13)
+        fs_title = self.scaled_font_size(16)
+        
         self.txt_summary = tk.Text(
             summary_frame,
             bg=self.bg_surface,
             fg=self.text_primary,
             insertbackground=self.accent,
-            font=("Consolas", 10),
+            font=("Consolas", fs),
             highlightthickness=0,
             bd=0,
         )
         self.txt_summary.pack(fill=tk.BOTH, expand=True)
         
+        # === TAGS DE COULEUR STYLE ÉDITEUR DE CODE ===
+        # Titres / Sections (comme les mots-clés)
+        self.txt_summary.tag_configure("title", foreground="#ff79c6", font=("Consolas", fs_title, "bold"))  # Rose/Magenta
+        self.txt_summary.tag_configure("section", foreground="#ffb86c", font=("Consolas", fs, "bold"))  # Orange
+        # Labels de paramètres (comme les variables)
+        self.txt_summary.tag_configure("label", foreground="#8be9fd")  # Cyan
+        # Valeurs numériques (comme les nombres)
+        self.txt_summary.tag_configure("number", foreground="#bd93f9")  # Violet
+        # Unités (comme les commentaires)
+        self.txt_summary.tag_configure("unit", foreground="#6272a4")  # Gris-bleu
+        # Valeurs de chaîne (comme les strings)
+        self.txt_summary.tag_configure("string", foreground="#f1fa8c")  # Jaune
+        # Succès / OK
+        self.txt_summary.tag_configure("success", foreground="#50fa7b")  # Vert
+        # Avertissement
+        self.txt_summary.tag_configure("warning", foreground="#ffb347")  # Orange chaud
+        # Erreur / Critique
+        self.txt_summary.tag_configure("error", foreground="#ff5555")  # Rouge
+        # Séparateurs
+        self.txt_summary.tag_configure("separator", foreground="#44475a")  # Gris foncé
+        # Symboles spéciaux
+        self.txt_summary.tag_configure("symbol", foreground="#ff79c6")  # Rose
+        
         # Ajouter une scrollbar
         scrollbar = ttk.Scrollbar(self.txt_summary, command=self.txt_summary.yview, style="Vertical.TScrollbar")
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.txt_summary.config(yscrollcommand=scrollbar.set)
+
+    def insert_colored_summary(self, summary: str, cooling_status: str, coolant_warning: str):
+        """Insère le summary avec coloration syntaxique style éditeur de code."""
+        import re
+        
+        lines = summary.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            
+            # Lignes de séparateurs (═══)
+            if '═══' in line or '---' in line:
+                self.txt_summary.insert(tk.END, line + '\n', 'separator')
+                continue
+            
+            # Titre principal (SITH MISCHUNG...)
+            if 'SITH MISCHUNG' in line or 'LIGHT SIDE EDITION' in line:
+                self.txt_summary.insert(tk.END, line + '\n', 'title')
+                continue
+            
+            # Sections (--- XXX ---)
+            if stripped.startswith('---') and stripped.endswith('---'):
+                self.txt_summary.insert(tk.END, line + '\n', 'section')
+                continue
+            
+            # Statuts de refroidissement
+            if '✅' in line or 'OK' in line.upper() and 'Refroidissement' in line:
+                self.txt_summary.insert(tk.END, line + '\n', 'success')
+                continue
+            if '⚠️' in line or '❌' in line:
+                tag = 'error' if '❌' in line else 'warning'
+                self.txt_summary.insert(tk.END, line + '\n', tag)
+                continue
+            
+            # Lignes avec ":" (label : valeur)
+            if ':' in line and not stripped.startswith('#'):
+                parts = line.split(':', 1)
+                if len(parts) == 2:
+                    label_part = parts[0] + ':'
+                    value_part = parts[1]
+                    
+                    self.txt_summary.insert(tk.END, label_part, 'label')
+                    
+                    # Colorer les nombres dans la partie valeur
+                    # Pattern pour trouver les nombres (y compris décimaux et négatifs)
+                    tokens = re.split(r'(-?\d+\.?\d*)', value_part)
+                    for token in tokens:
+                        if re.match(r'^-?\d+\.?\d*$', token) and token not in ('', '-'):
+                            self.txt_summary.insert(tk.END, token, 'number')
+                        elif any(u in token for u in ['mm', 'MW', 'kW', 'K', 's', 'bar', 'kg', 'm/', 'J/', 'W/', 'kN', 'N', '°', '%']):
+                            # Unités
+                            self.txt_summary.insert(tk.END, token, 'unit')
+                        elif any(c in token for c in ['∞', 'ε', 'Ø', 'Δ', '@']):
+                            # Symboles spéciaux
+                            self.txt_summary.insert(tk.END, token, 'symbol')
+                        else:
+                            # Texte normal ou strings
+                            self.txt_summary.insert(tk.END, token, 'string')
+                    
+                    self.txt_summary.insert(tk.END, '\n')
+                    continue
+            
+            # Ligne normale
+            self.txt_summary.insert(tk.END, line + '\n')
+
+    def insert_colored_cea(self, raw: str):
+        """Insère la sortie CEA avec coloration syntaxique."""
+        import re
+        
+        lines = raw.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            
+            # Headers (lignes en majuscules ou avec ===)
+            if stripped.startswith('*') or stripped.startswith('=') or '***' in line:
+                self.txt_cea.insert(tk.END, line + '\n', 'cea_header')
+                continue
+            
+            # Sections principales (THEORETICAL ROCKET, COMBUSTION, etc.)
+            if stripped.isupper() and len(stripped) > 3 and not any(c.isdigit() for c in stripped):
+                self.txt_cea.insert(tk.END, line + '\n', 'cea_section')
+                continue
+            
+            # Lignes de données avec valeurs numériques
+            if '=' in line or any(c.isdigit() for c in line):
+                # Détecter les propriétés connues
+                props = ['P,', 'T,', 'RHO,', 'H,', 'U,', 'G,', 'S,', 'M,', 'Cp,', 'GAMMAs', 'SON VEL', 
+                         'MACH', 'VISC', 'CONDUCTIVITY', 'PRANDTL', 'Ae/At', 'CSTAR', 'CF', 'Ivac', 'Isp']
+                is_prop_line = any(prop in line for prop in props)
+                
+                if is_prop_line:
+                    # Coloriser label et valeur
+                    parts = line.split()
+                    for i, part in enumerate(parts):
+                        if re.match(r'^-?\d+\.?\d*[eE]?[+-]?\d*$', part):
+                            self.txt_cea.insert(tk.END, part, 'cea_value')
+                        elif part.upper() in ['BAR', 'ATM', 'K', 'KG/M**3', 'KJ/KG', 'M/SEC', 'SEC', 'POISE']:
+                            self.txt_cea.insert(tk.END, part, 'cea_unit')
+                        else:
+                            self.txt_cea.insert(tk.END, part, 'cea_property')
+                        if i < len(parts) - 1:
+                            self.txt_cea.insert(tk.END, ' ')
+                    self.txt_cea.insert(tk.END, '\n')
+                    continue
+                
+                # Espèces chimiques (lignes avec formules)
+                species_patterns = [r'\*[A-Z][a-z]?', r'CO2', r'H2O', r'OH', r'O2', r'H2', r'N2', r'CO', r'NO']
+                if any(re.search(pat, line) for pat in species_patterns) and 'MOLE' not in line.upper():
+                    # Coloriser les espèces
+                    tokens = line.split()
+                    for i, token in enumerate(tokens):
+                        if re.match(r'^\*?[A-Z][A-Za-z0-9]*(\([A-Za-z]\))?$', token):
+                            self.txt_cea.insert(tk.END, token, 'cea_species')
+                        elif re.match(r'^-?\d+\.?\d*[eE]?[+-]?\d*$', token):
+                            self.txt_cea.insert(tk.END, token, 'cea_value')
+                        else:
+                            self.txt_cea.insert(tk.END, token)
+                        if i < len(tokens) - 1:
+                            self.txt_cea.insert(tk.END, ' ')
+                    self.txt_cea.insert(tk.END, '\n')
+                    continue
+            
+            # Ligne normale
+            self.txt_cea.insert(tk.END, line + '\n')
 
     def init_visu_tab(self):
         tk.Frame(self.tab_visu, height=4, bg=self.tab_accent.get("visu", self.accent_alt3)).pack(fill=tk.X)
@@ -285,9 +479,10 @@ class RocketApp:
 
     def init_cea_tab(self):
         tk.Frame(self.tab_cea, height=4, bg=self.tab_accent.get("cea", self.accent_alt2)).pack(fill=tk.X)
+        fs = self.scaled_font_size(13)
         self.txt_cea = scrolledtext.ScrolledText(
             self.tab_cea,
-            font=("Consolas", 10),
+            font=("Consolas", fs),
             state='disabled',
             bg=self.bg_surface,
             fg=self.text_primary,
@@ -296,6 +491,15 @@ class RocketApp:
             bd=0,
         )
         self.txt_cea.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Tags de coloration CEA style éditeur de code
+        self.txt_cea.tag_configure("cea_header", foreground="#ff79c6", font=("Consolas", fs, "bold"))
+        self.txt_cea.tag_configure("cea_section", foreground="#ffb86c")
+        self.txt_cea.tag_configure("cea_property", foreground="#8be9fd")
+        self.txt_cea.tag_configure("cea_value", foreground="#bd93f9")
+        self.txt_cea.tag_configure("cea_unit", foreground="#6272a4")
+        self.txt_cea.tag_configure("cea_species", foreground="#50fa7b")
+        self.txt_cea.tag_configure("cea_comment", foreground="#6272a4", font=("Consolas", fs, "italic"))
         
     def init_thermal_tab(self):
         tk.Frame(self.tab_thermal, height=4, bg=self.tab_accent.get("thermal", self.accent_alt)).pack(fill=tk.X)
@@ -548,9 +752,12 @@ class RocketApp:
         detail_frame = ttk.LabelFrame(content_frame, text="Détails du Propergol", padding=10)
         detail_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
+        fs = self.scaled_font_size(13)
+        fs_title = self.scaled_font_size(16)
+        
         self.db_details = scrolledtext.ScrolledText(
             detail_frame,
-            font=("Consolas", 10),
+            font=("Consolas", fs),
             width=50,
             height=25,
             state='disabled',
@@ -561,6 +768,15 @@ class RocketApp:
             bd=0,
         )
         self.db_details.pack(fill=tk.BOTH, expand=True)
+        
+        # Tags de couleur pour la base de données
+        self.db_details.tag_configure("db_title", foreground="#ff79c6", font=("Consolas", fs_title, "bold"))
+        self.db_details.tag_configure("db_section", foreground="#ffb86c", font=("Consolas", fs, "bold"))
+        self.db_details.tag_configure("db_label", foreground="#8be9fd")
+        self.db_details.tag_configure("db_number", foreground="#bd93f9")
+        self.db_details.tag_configure("db_unit", foreground="#6272a4")
+        self.db_details.tag_configure("db_string", foreground="#f1fa8c")
+        self.db_details.tag_configure("db_success", foreground="#50fa7b")
         
         # Charger la base de données au démarrage
         self.root.after(100, self.load_database)
@@ -670,7 +886,8 @@ class RocketApp:
             ))
     
     def on_propellant_select(self, event):
-        """Affiche les détails du propergol sélectionné"""
+        """Affiche les détails du propergol sélectionné avec coloration syntaxique"""
+        import re
         selection = self.db_tree.selection()
         if not selection:
             return
@@ -688,49 +905,76 @@ class RocketApp:
         if not prop:
             return
         
+        self.db_details.config(state='normal')
+        self.db_details.delete(1.0, tk.END)
+        
+        # Helper pour insérer avec couleurs
+        def insert_separator(text):
+            self.db_details.insert(tk.END, text + '\n', 'db_label')
+        
+        def insert_title(text):
+            self.db_details.insert(tk.END, text + '\n', 'db_title')
+        
+        def insert_section(text):
+            self.db_details.insert(tk.END, text + '\n', 'db_section')
+        
+        def insert_line(label, value, unit=""):
+            self.db_details.insert(tk.END, f"{label}: ", 'db_label')
+            # Coloriser les nombres dans la valeur
+            str_val = str(value)
+            tokens = re.split(r'(-?\d+\.?\d*)', str_val)
+            for token in tokens:
+                if re.match(r'^-?\d+\.?\d*$', token) and token:
+                    self.db_details.insert(tk.END, token, 'db_number')
+                else:
+                    self.db_details.insert(tk.END, token, 'db_string')
+            if unit:
+                self.db_details.insert(tk.END, f" {unit}", 'db_unit')
+            self.db_details.insert(tk.END, '\n')
+        
         # Construire les détails
         t_ref = prop['t_ref'] if prop['t_ref'] is not None else 298
-        details = f"""═══════════════════════════════════════
-  PROPERGOL: {prop['name']}
-═══════════════════════════════════════
-
-Type            : {prop['type']}
-T référence     : {t_ref:.2f} K ({t_ref-273.15:.1f}°C)
-
-"""
+        
+        insert_separator("═══════════════════════════════════════")
+        insert_title(f"  PROPERGOL: {prop['name']}")
+        insert_separator("═══════════════════════════════════════\n")
+        
+        insert_line("Type            ", prop['type'])
+        insert_line("T référence     ", f"{t_ref:.2f}", f"K ({t_ref-273.15:.1f}°C)")
+        self.db_details.insert(tk.END, '\n')
         
         # Ajouter les propriétés thermiques si disponibles
         if prop['type'] == 'Coolant':
-            details += "--- PROPRIÉTÉS COOLANT ---\n"
-            details += f"Info: {prop['formula']}\n\n"
-            details += "Utilisable directement comme coolant externe.\n"
-            details += "Tapez ce nom dans le champ 'Coolant' du simulateur.\n"
+            insert_section("--- PROPRIÉTÉS COOLANT ---")
+            insert_line("Info", prop['formula'])
+            self.db_details.insert(tk.END, '\n', '')
+            self.db_details.insert(tk.END, "Utilisable directement comme coolant externe.\n", 'db_success')
+            self.db_details.insert(tk.END, "Tapez ce nom dans le champ 'Coolant' du simulateur.\n", 'db_string')
         
         elif prop['type'] == 'Fuel':
             from rocketcea.blends import fuelCards, getFuelRefTempDegK, getFloatTokenFromCards
             
-            details += "--- CARTE NASA CEA ---\n"
+            insert_section("--- CARTE NASA CEA ---")
             if prop['cards']:
                 for card in prop['cards']:
-                    details += f"{card}\n"
+                    self.db_details.insert(tk.END, f"{card}\n", 'db_string')
             
-            details += "\n--- PROPRIÉTÉS EXTRAITES ---\n"
+            insert_section("\n--- PROPRIÉTÉS EXTRAITES ---")
             try:
                 cards = fuelCards.get(prop['name'], [])
                 rho = getFloatTokenFromCards(cards, 'rho')
                 if rho:
-                    details += f"Densité (rho)   : {rho:.4f} g/cm³ ({rho*1000:.1f} kg/m³)\n"
+                    insert_line("Densité (rho)   ", f"{rho:.4f}", f"g/cm³ ({rho*1000:.1f} kg/m³)")
                 
                 # Chercher h,cal (enthalpie)
                 for card in cards:
                     if 'h,cal' in card:
-                        import re
                         match = re.search(r'h,cal=(-?\d+\.?\d*)', card)
                         if match:
                             h_cal = float(match.group(1))
-                            details += f"Enthalpie (h)   : {h_cal:.1f} cal/mol\n"
+                            insert_line("Enthalpie (h)   ", f"{h_cal:.1f}", "cal/mol")
             except Exception as e:
-                details += f"Erreur extraction: {e}\n"
+                self.db_details.insert(tk.END, f"Erreur extraction: {e}\n", 'db_label')
             
             # Ajouter les propriétés thermiques si dans nos tables
             cp_table = {
@@ -747,42 +991,44 @@ T référence     : {t_ref:.2f} K ({t_ref-273.15:.1f}°C)
             }
             
             if prop['name'] in cp_table:
-                details += f"\n--- PROPRIÉTÉS THERMIQUES (table interne) ---\n"
-                details += f"Cp liquide      : {cp_table[prop['name']]} J/kg-K\n"
+                insert_section("\n--- PROPRIÉTÉS THERMIQUES (table interne) ---")
+                insert_line("Cp liquide      ", cp_table[prop['name']], "J/kg-K")
             if prop['name'] in hvap_table:
-                details += f"Hvap            : {hvap_table[prop['name']]} kJ/kg\n"
+                insert_line("Hvap            ", hvap_table[prop['name']], "kJ/kg")
             if prop['name'] in t_crit_table:
-                details += f"T critique      : {t_crit_table[prop['name']]} K\n"
+                insert_line("T critique      ", t_crit_table[prop['name']], "K")
             
-            details += "\n--- UTILISATION ---\n"
-            details += f"CEA Fuel    : Tapez '{prop['name']}' dans Carburant (CEA)\n"
-            details += f"Coolant     : Tapez '{prop['name']}' dans Coolant (Auto=fuel)\n"
+            insert_section("\n--- UTILISATION ---")
+            self.db_details.insert(tk.END, f"CEA Fuel    : Tapez '", 'db_label')
+            self.db_details.insert(tk.END, prop['name'], 'db_success')
+            self.db_details.insert(tk.END, "' dans Carburant (CEA)\n", 'db_label')
+            self.db_details.insert(tk.END, f"Coolant     : Tapez '", 'db_label')
+            self.db_details.insert(tk.END, prop['name'], 'db_success')
+            self.db_details.insert(tk.END, "' dans Coolant (Auto=fuel)\n", 'db_label')
         
         elif prop['type'] == 'Oxydant':
             from rocketcea.blends import oxCards, getOxRefTempDegK, getFloatTokenFromCards
             
-            details += "--- CARTE NASA CEA ---\n"
+            insert_section("--- CARTE NASA CEA ---")
             if prop['cards']:
                 for card in prop['cards']:
-                    details += f"{card}\n"
+                    self.db_details.insert(tk.END, f"{card}\n", 'db_string')
             
-            details += "\n--- PROPRIÉTÉS EXTRAITES ---\n"
+            insert_section("\n--- PROPRIÉTÉS EXTRAITES ---")
             try:
                 cards = oxCards.get(prop['name'], [])
                 rho = getFloatTokenFromCards(cards, 'rho')
                 if rho:
-                    details += f"Densité (rho)   : {rho:.4f} g/cm³ ({rho*1000:.1f} kg/m³)\n"
+                    insert_line("Densité (rho)   ", f"{rho:.4f}", f"g/cm³ ({rho*1000:.1f} kg/m³)")
             except Exception as e:
-                details += f"Erreur extraction: {e}\n"
+                self.db_details.insert(tk.END, f"Erreur extraction: {e}\n", 'db_label')
             
-            details += "\n--- UTILISATION ---\n"
-            details += f"CEA Oxydant : Tapez '{prop['name']}' dans Oxydant (CEA)\n"
-            details += f"Coolant     : Peut être utilisé comme coolant (LOX cooling)\n"
+            insert_section("\n--- UTILISATION ---")
+            self.db_details.insert(tk.END, f"CEA Oxydant : Tapez '", 'db_label')
+            self.db_details.insert(tk.END, prop['name'], 'db_success')
+            self.db_details.insert(tk.END, "' dans Oxydant (CEA)\n", 'db_label')
+            self.db_details.insert(tk.END, "Coolant     : Peut être utilisé comme coolant (LOX cooling)\n", 'db_string')
         
-        # Afficher
-        self.db_details.config(state='normal')
-        self.db_details.delete(1.0, tk.END)
-        self.db_details.insert(tk.END, details)
         self.db_details.config(state='disabled')
     
     def copy_selected_name(self):
@@ -1534,7 +1780,10 @@ T référence     : {t_ref:.2f} K ({t_ref-273.15:.1f}°C)
             self.ax_temp.legend(loc='upper right', fontsize=8, facecolor=self.bg_surface, edgecolor=self.accent)
             self.ax_temp.grid(True, color=self.grid_color, alpha=0.35)
             
-            self.canvas_thermal.draw()
+            # Forcer le rafraîchissement complet de la figure
+            self.fig_thermal.tight_layout()
+            self.canvas_thermal.draw_idle()
+            self.canvas_thermal.flush_events()
             
             # Géométrie 2D
             self.draw_engine(X_mm, Y_mm)
@@ -1605,14 +1854,14 @@ Débit Fuel      : {mdot_fuel_available:.4f} kg/s
 Débit Oxydant   : {mdot_ox_available:.4f} kg/s
 """
             self.txt_summary.delete(1.0, tk.END)
-            self.txt_summary.insert(tk.END, summary)
+            self.insert_colored_summary(summary, cooling_status, coolant_warning)
             
-            # Raw CEA output
+            # Raw CEA output avec coloration
             try:
                 raw = ispObj.get_full_cea_output(Pc=pc_psi, MR=mr, eps=eps, pc_units='bar', output='calories')
                 self.txt_cea.config(state='normal')
                 self.txt_cea.delete(1.0, tk.END)
-                self.txt_cea.insert(tk.END, raw)
+                self.insert_colored_cea(raw)
                 self.txt_cea.config(state='disabled')
             except:
                 pass
