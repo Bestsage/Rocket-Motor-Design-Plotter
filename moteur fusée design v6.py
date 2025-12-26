@@ -28,10 +28,24 @@ try:
 except ImportError:
     HAS_EZDXF = False
 
+# Essayer d'importer numpy-stl pour l'export 3D
+try:
+    from stl import mesh as stl_mesh
+    HAS_NUMPY_STL = True
+except ImportError:
+    HAS_NUMPY_STL = False
+
+# Essayer d'importer cadquery pour l'export STEP
+try:
+    import cadquery as cq
+    HAS_CADQUERY = True
+except ImportError:
+    HAS_CADQUERY = False
+
 class RocketApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("SITH MISCHUNG COMBUSTION : LIGHT SIDE EDITION v6.2")
+        self.root.title("SITH MISCHUNG COMBUSTION : DARK SIDE EDITION v6.3")
         self.root.geometry("1700x1080")
         self.root.state('zoomed')  # Maximize for large displays
 
@@ -130,6 +144,11 @@ class RocketApp:
         self.tab_summary = ttk.Frame(self.tabs)
         self.tab_visu = ttk.Frame(self.tabs)
         self.tab_thermal = ttk.Frame(self.tabs)
+        self.tab_heatmap = ttk.Frame(self.tabs)
+        self.tab_cad = ttk.Frame(self.tabs)
+        self.tab_optimizer = ttk.Frame(self.tabs)
+        self.tab_stress = ttk.Frame(self.tabs)
+        self.tab_transient = ttk.Frame(self.tabs)
         self.tab_graphs = ttk.Frame(self.tabs)
         self.tab_cea = ttk.Frame(self.tabs)
         self.tab_database = ttk.Frame(self.tabs)
@@ -139,6 +158,11 @@ class RocketApp:
         self.tabs.add(self.tab_summary, text="📊 Résumé")
         self.tabs.add(self.tab_visu, text="Visualisation 2D")
         self.tabs.add(self.tab_thermal, text="Analyse Thermique (Bartz)")
+        self.tabs.add(self.tab_heatmap, text="🔥 Carte Thermique")
+        self.tabs.add(self.tab_cad, text="🔧 Export CAD 3D")
+        self.tabs.add(self.tab_optimizer, text="⚙️ Optimiseur")
+        self.tabs.add(self.tab_stress, text="🛡️ Contraintes")
+        self.tabs.add(self.tab_transient, text="⏱️ Transitoire")
         self.tabs.add(self.tab_graphs, text="Analyses Paramétriques")
         self.tabs.add(self.tab_cea, text="Sortie NASA CEA (Raw)")
         self.tabs.add(self.tab_database, text="🔍 Base de Données")
@@ -152,6 +176,11 @@ class RocketApp:
         self.init_summary_tab()
         self.init_visu_tab()
         self.init_thermal_tab()
+        self.init_heatmap_tab()
+        self.init_cad_tab()
+        self.init_optimizer_tab()
+        self.init_stress_tab()
+        self.init_transient_tab()
         self.init_cea_tab()
         self.init_graphs_tab()
         self.init_database_tab()
@@ -535,6 +564,2275 @@ class RocketApp:
         self.canvas_thermal = FigureCanvasTkAgg(self.fig_thermal, master=self.tab_thermal)
         self.canvas_thermal.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
         self.canvas_thermal.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    def init_heatmap_tab(self):
+        """Initialise l'onglet Carte Thermique 2D avec visualisation colorée."""
+        # Barre d'accent
+        tk.Frame(self.tab_heatmap, height=4, bg="#ff6b35").pack(fill=tk.X)
+        
+        # Frame de contrôles
+        ctrl_frame = ttk.LabelFrame(self.tab_heatmap, text="🔥 Carte Thermique 2D - Visualisation Température Paroi", padding=10)
+        ctrl_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+        
+        # Ligne 1: Options de visualisation
+        row1 = ttk.Frame(ctrl_frame)
+        row1.pack(fill=tk.X, pady=3)
+        
+        ttk.Label(row1, text="Mode:").pack(side=tk.LEFT, padx=(0, 5))
+        self.heatmap_mode = tk.StringVar(value="coupe_radiale")
+        modes = [("Coupe Radiale", "coupe_radiale"), ("Développée", "developpee"), ("3D Surface", "surface_3d")]
+        for text, mode in modes:
+            ttk.Radiobutton(row1, text=text, variable=self.heatmap_mode, value=mode, 
+                           command=self.update_heatmap).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Separator(row1, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=15)
+        
+        ttk.Label(row1, text="Colormap:").pack(side=tk.LEFT, padx=(0, 5))
+        self.heatmap_cmap = ttk.Combobox(row1, values=["inferno", "plasma", "hot", "jet", "coolwarm", "magma", "viridis"], 
+                                          state="readonly", width=10)
+        self.heatmap_cmap.set("inferno")
+        self.heatmap_cmap.pack(side=tk.LEFT, padx=5)
+        self.heatmap_cmap.bind("<<ComboboxSelected>>", lambda e: self.update_heatmap())
+        
+        ttk.Label(row1, text="Résolution:").pack(side=tk.LEFT, padx=(15, 5))
+        self.heatmap_resolution = ttk.Spinbox(row1, from_=10, to=200, width=5)
+        self.heatmap_resolution.set(50)
+        self.heatmap_resolution.pack(side=tk.LEFT)
+        
+        # Ligne 2: Options supplémentaires
+        row2 = ttk.Frame(ctrl_frame)
+        row2.pack(fill=tk.X, pady=3)
+        
+        self.heatmap_show_isotherms = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="Isothermes", variable=self.heatmap_show_isotherms,
+                       command=self.update_heatmap).pack(side=tk.LEFT, padx=5)
+        
+        self.heatmap_show_limits = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="Limites matériau", variable=self.heatmap_show_limits,
+                       command=self.update_heatmap).pack(side=tk.LEFT, padx=5)
+        
+        self.heatmap_show_flux = tk.BooleanVar(value=False)
+        ttk.Checkbutton(row2, text="Vecteurs flux", variable=self.heatmap_show_flux,
+                       command=self.update_heatmap).pack(side=tk.LEFT, padx=5)
+        
+        self.heatmap_show_channels = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="Canaux coolant", variable=self.heatmap_show_channels,
+                       command=self.update_heatmap).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Separator(row2, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=15)
+        
+        ttk.Label(row2, text="Position X (mm):").pack(side=tk.LEFT, padx=(0, 5))
+        self.heatmap_x_pos = ttk.Scale(row2, from_=-100, to=200, orient=tk.HORIZONTAL, length=150,
+                                        command=lambda v: self.update_heatmap())
+        self.heatmap_x_pos.set(0)  # Position au col par défaut
+        self.heatmap_x_pos.pack(side=tk.LEFT, padx=5)
+        self.heatmap_x_label = ttk.Label(row2, text="0 mm (col)")
+        self.heatmap_x_label.pack(side=tk.LEFT)
+        
+        ttk.Button(row2, text="🔄 Actualiser", command=self.update_heatmap).pack(side=tk.RIGHT, padx=10)
+        
+        # Ligne 3: Informations thermiques en temps réel
+        self.heatmap_info_frame = ttk.LabelFrame(ctrl_frame, text="📊 Données au point sélectionné", padding=5)
+        self.heatmap_info_frame.pack(fill=tk.X, pady=5)
+        
+        info_row = ttk.Frame(self.heatmap_info_frame)
+        info_row.pack(fill=tk.X)
+        
+        self.heatmap_info_labels = {}
+        info_items = [("T_gaz", "T gaz:"), ("T_hot", "T paroi (hot):"), ("T_cold", "T paroi (cold):"), 
+                      ("T_cool", "T coolant:"), ("flux", "Flux:"), ("hg", "h_g:")]
+        for key, text in info_items:
+            ttk.Label(info_row, text=text).pack(side=tk.LEFT, padx=(10, 2))
+            lbl = ttk.Label(info_row, text="---", foreground=self.accent)
+            lbl.pack(side=tk.LEFT, padx=(0, 15))
+            self.heatmap_info_labels[key] = lbl
+        
+        # Figure matplotlib pour la carte thermique
+        self.fig_heatmap = plt.Figure(figsize=(10, 6), dpi=100)
+        self.fig_heatmap.patch.set_facecolor(self.bg_main)
+        
+        # Créer les axes (on utilisera différentes configurations selon le mode)
+        self.ax_heatmap = self.fig_heatmap.add_subplot(111)
+        self.ax_heatmap.set_facecolor(self.bg_surface)
+        self.apply_dark_axes([self.ax_heatmap])
+        
+        self.canvas_heatmap = FigureCanvasTkAgg(self.fig_heatmap, master=self.tab_heatmap)
+        self.canvas_heatmap.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
+        self.canvas_heatmap.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Connecter l'événement de clic pour afficher les infos
+        self.canvas_heatmap.mpl_connect('motion_notify_event', self.on_heatmap_hover)
+        self.canvas_heatmap.mpl_connect('button_press_event', self.on_heatmap_click)
+        
+        # Données stockées pour interaction
+        self.heatmap_data = None
+
+    def update_heatmap(self):
+        """Met à jour la carte thermique 2D."""
+        # Vérifier que l'onglet est initialisé
+        if not hasattr(self, 'ax_heatmap') or self.ax_heatmap is None:
+            return
+        if not hasattr(self, 'canvas_heatmap') or self.canvas_heatmap is None:
+            return
+            
+        if not self.results or "thermal_profile" not in self.results:
+            self.ax_heatmap.clear()
+            self.ax_heatmap.set_facecolor(self.bg_surface)
+            self.ax_heatmap.text(0.5, 0.5, "Calculez d'abord le moteur\n(bouton CALCULER)", 
+                                ha='center', va='center', fontsize=14, color=self.text_muted,
+                                transform=self.ax_heatmap.transAxes)
+            self.apply_dark_axes([self.ax_heatmap])
+            self.canvas_heatmap.draw()
+            return
+        
+        mode = self.heatmap_mode.get()
+        
+        if mode == "coupe_radiale":
+            self.draw_heatmap_radial_cut()
+        elif mode == "developpee":
+            self.draw_heatmap_developed()
+        elif mode == "surface_3d":
+            self.draw_heatmap_3d_surface()
+        
+        self.canvas_heatmap.draw()
+
+    def draw_heatmap_radial_cut(self):
+        """Dessine la carte thermique en coupe radiale à une position X donnée."""
+        self.fig_heatmap.clear()
+        self.ax_heatmap = self.fig_heatmap.add_subplot(111)
+        self.ax_heatmap.set_facecolor(self.bg_surface)
+        
+        profile = self.results["thermal_profile"]
+        X_mm = np.array(profile["X_mm"])
+        Y_mm = np.array(profile["Y_mm"])
+        T_gas = np.array(profile["T_gas"])
+        T_wall_hot = np.array(profile["T_wall_hot"])
+        T_wall_cold = profile["T_wall_cold"]
+        Flux_MW = np.array(profile["Flux_MW"])
+        
+        # Position X sélectionnée
+        x_pos = float(self.heatmap_x_pos.get())
+        self.heatmap_x_label.config(text=f"{x_pos:.1f} mm")
+        
+        # Trouver l'index le plus proche
+        idx = np.argmin(np.abs(X_mm - x_pos))
+        
+        # Données à cette position
+        r_inner = Y_mm[idx]  # Rayon intérieur (côté gaz)
+        wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+        r_outer = r_inner + wall_thickness  # Rayon extérieur (côté coolant)
+        
+        t_gas_local = T_gas[idx]
+        t_hot_local = T_wall_hot[idx]
+        t_cold_local = T_wall_cold if isinstance(T_wall_cold, (int, float)) else T_wall_cold
+        flux_local = Flux_MW[idx]
+        
+        # Température coolant (estimation)
+        t_coolant = self.get_val("coolant_tin") if self.get_val("coolant_tin") else 300
+        
+        # Créer une grille pour la visualisation
+        n_theta = int(self.heatmap_resolution.get())
+        n_r = 30  # Nombre de points dans l'épaisseur
+        
+        theta = np.linspace(0, 2*np.pi, n_theta)
+        r = np.linspace(r_inner, r_outer, n_r)
+        
+        THETA, R = np.meshgrid(theta, r)
+        X = R * np.cos(THETA)
+        Y = R * np.sin(THETA)
+        
+        # Interpolation linéaire de la température dans l'épaisseur
+        # T(r) = T_hot + (T_cold - T_hot) * (r - r_inner) / wall_thickness
+        T = t_hot_local + (t_cold_local - t_hot_local) * (R - r_inner) / wall_thickness
+        
+        # Tracer la carte de couleur
+        cmap = self.heatmap_cmap.get()
+        levels = np.linspace(t_cold_local - 50, t_hot_local + 50, 50)
+        
+        contour = self.ax_heatmap.contourf(X, Y, T, levels=levels, cmap=cmap, extend='both')
+        
+        # Barre de couleur
+        cbar = self.fig_heatmap.colorbar(contour, ax=self.ax_heatmap, label='Température (K)', pad=0.02)
+        cbar.ax.yaxis.label.set_color(self.text_primary)
+        cbar.ax.tick_params(colors=self.text_primary)
+        
+        # Isothermes
+        if self.heatmap_show_isotherms.get():
+            iso_levels = np.linspace(t_cold_local, t_hot_local, 8)
+            iso = self.ax_heatmap.contour(X, Y, T, levels=iso_levels, colors='white', linewidths=0.5, alpha=0.7)
+            self.ax_heatmap.clabel(iso, inline=True, fontsize=8, fmt='%.0f K', colors='white')
+        
+        # Limites du matériau
+        if self.heatmap_show_limits.get():
+            # Cercle de limite de température
+            wall_k = self.get_val("wall_k") if self.get_val("wall_k") else 320
+            t_limit = self.get_val("twall") if self.get_val("twall") else 1000
+            
+            # Trouver le rayon où T = T_limit (si applicable)
+            if t_hot_local > t_limit:
+                r_limit = r_inner + (t_limit - t_hot_local) / (t_cold_local - t_hot_local) * wall_thickness
+                if r_inner < r_limit < r_outer:
+                    circle_limit = plt.Circle((0, 0), r_limit, fill=False, color='red', 
+                                              linestyle='--', linewidth=2, label=f'T_limite ({t_limit:.0f} K)')
+                    self.ax_heatmap.add_patch(circle_limit)
+        
+        # Canaux de refroidissement (représentation schématique)
+        if self.heatmap_show_channels.get():
+            n_channels = 40  # Nombre de canaux (exemple)
+            channel_width = 2  # mm
+            for i in range(n_channels):
+                angle = 2 * np.pi * i / n_channels
+                # Rectangle représentant un canal
+                x_ch = r_outer * np.cos(angle)
+                y_ch = r_outer * np.sin(angle)
+                self.ax_heatmap.plot(x_ch, y_ch, 's', color=self.accent, markersize=4, alpha=0.8)
+        
+        # Cercles de référence
+        circle_inner = plt.Circle((0, 0), r_inner, fill=False, color=self.accent, linewidth=1.5, linestyle='-')
+        circle_outer = plt.Circle((0, 0), r_outer, fill=False, color='#00ff88', linewidth=1.5, linestyle='-')
+        self.ax_heatmap.add_patch(circle_inner)
+        self.ax_heatmap.add_patch(circle_outer)
+        
+        # Zone gaz (intérieur)
+        gas_circle = plt.Circle((0, 0), r_inner * 0.98, color='#ff4444', alpha=0.15)
+        self.ax_heatmap.add_patch(gas_circle)
+        self.ax_heatmap.text(0, 0, f'GAZ\n{t_gas_local:.0f} K', ha='center', va='center', 
+                            fontsize=10, color='#ff6666', fontweight='bold')
+        
+        # Annotations
+        self.ax_heatmap.annotate(f'T_hot = {t_hot_local:.0f} K', xy=(r_inner, 0), xytext=(r_inner + wall_thickness/4, wall_thickness),
+                                fontsize=9, color='yellow', ha='center',
+                                arrowprops=dict(arrowstyle='->', color='yellow', lw=0.5))
+        self.ax_heatmap.annotate(f'T_cold = {t_cold_local:.0f} K', xy=(r_outer, 0), xytext=(r_outer + 5, -wall_thickness),
+                                fontsize=9, color='#00ff88', ha='center',
+                                arrowprops=dict(arrowstyle='->', color='#00ff88', lw=0.5))
+        
+        # Configuration des axes
+        max_r = r_outer * 1.3
+        self.ax_heatmap.set_xlim(-max_r, max_r)
+        self.ax_heatmap.set_ylim(-max_r, max_r)
+        self.ax_heatmap.set_aspect('equal')
+        self.ax_heatmap.set_xlabel('Position (mm)', color=self.text_primary)
+        self.ax_heatmap.set_ylabel('Position (mm)', color=self.text_primary)
+        
+        # Titre avec infos
+        region = "Chambre" if x_pos < -self.results.get('lc', 0) else ("Col" if abs(x_pos) < 5 else "Divergent")
+        self.ax_heatmap.set_title(f'Coupe Radiale @ X = {x_pos:.1f} mm ({region}) | Flux = {flux_local:.2f} MW/m²',
+                                  color=self.text_primary, fontsize=12, fontweight='bold')
+        
+        self.apply_dark_axes([self.ax_heatmap])
+        self.fig_heatmap.tight_layout()
+        
+        # Stocker les données pour interaction
+        self.heatmap_data = {
+            "x_pos": x_pos, "r_inner": r_inner, "r_outer": r_outer,
+            "t_gas": t_gas_local, "t_hot": t_hot_local, "t_cold": t_cold_local,
+            "flux": flux_local, "t_coolant": t_coolant
+        }
+        
+        # Mettre à jour les labels d'info
+        self.update_heatmap_info(x_pos, t_gas_local, t_hot_local, t_cold_local, t_coolant, flux_local)
+
+    def draw_heatmap_developed(self):
+        """Dessine la carte thermique développée (X vs épaisseur)."""
+        self.fig_heatmap.clear()
+        self.ax_heatmap = self.fig_heatmap.add_subplot(111)
+        self.ax_heatmap.set_facecolor(self.bg_surface)
+        
+        profile = self.results["thermal_profile"]
+        X_mm = np.array(profile["X_mm"])
+        Y_mm = np.array(profile["Y_mm"])
+        T_gas = np.array(profile["T_gas"])
+        T_wall_hot = np.array(profile["T_wall_hot"])
+        T_wall_cold = profile["T_wall_cold"]
+        Flux_MW = np.array(profile["Flux_MW"])
+        
+        wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+        n_depth = 30  # Points dans l'épaisseur
+        
+        # Créer la grille 2D (X, profondeur)
+        depth = np.linspace(0, wall_thickness, n_depth)  # 0 = côté gaz, wall_thickness = côté coolant
+        
+        X_grid, D_grid = np.meshgrid(X_mm, depth)
+        
+        # Température en fonction de X et de la profondeur
+        # T(x, d) = T_hot(x) + (T_cold - T_hot(x)) * d / wall_thickness
+        T_grid = np.zeros_like(X_grid)
+        for i, x in enumerate(X_mm):
+            t_hot = T_wall_hot[i]
+            t_cold = T_wall_cold if isinstance(T_wall_cold, (int, float)) else T_wall_cold
+            for j, d in enumerate(depth):
+                T_grid[j, i] = t_hot + (t_cold - t_hot) * d / wall_thickness
+        
+        # Tracer
+        cmap = self.heatmap_cmap.get()
+        t_min = min(T_wall_cold if isinstance(T_wall_cold, (int, float)) else min(T_wall_cold), min(T_wall_hot)) - 50
+        t_max = max(T_wall_hot) + 100
+        levels = np.linspace(t_min, t_max, 50)
+        
+        contour = self.ax_heatmap.contourf(X_grid, D_grid, T_grid, levels=levels, cmap=cmap, extend='both')
+        
+        cbar = self.fig_heatmap.colorbar(contour, ax=self.ax_heatmap, label='Température (K)', pad=0.02)
+        cbar.ax.yaxis.label.set_color(self.text_primary)
+        cbar.ax.tick_params(colors=self.text_primary)
+        
+        # Isothermes
+        if self.heatmap_show_isotherms.get():
+            iso_levels = np.linspace(t_min + 100, t_max - 100, 10)
+            iso = self.ax_heatmap.contour(X_grid, D_grid, T_grid, levels=iso_levels, 
+                                          colors='white', linewidths=0.5, alpha=0.7)
+            self.ax_heatmap.clabel(iso, inline=True, fontsize=7, fmt='%.0f K', colors='white')
+        
+        # Limites du matériau
+        if self.heatmap_show_limits.get():
+            t_limit = self.get_val("twall") if self.get_val("twall") else 1000
+            # Contour de la limite
+            limit_contour = self.ax_heatmap.contour(X_grid, D_grid, T_grid, levels=[t_limit], 
+                                                     colors=['red'], linewidths=2, linestyles='--')
+            if limit_contour.collections:
+                self.ax_heatmap.clabel(limit_contour, inline=True, fontsize=9, fmt=f'T_limite = {t_limit:.0f} K', colors='red')
+        
+        # Ligne du profil (forme de la tuyère) - juste pour référence
+        self.ax_heatmap.axhline(y=0, color=self.accent, linestyle='-', linewidth=1.5, label='Côté gaz')
+        self.ax_heatmap.axhline(y=wall_thickness, color='#00ff88', linestyle='-', linewidth=1.5, label='Côté coolant')
+        
+        # Marquer le col
+        self.ax_heatmap.axvline(x=0, color='white', linestyle=':', linewidth=1, alpha=0.5)
+        self.ax_heatmap.text(0, wall_thickness * 1.05, 'Col', ha='center', color='white', fontsize=9)
+        
+        # Ajouter le profil de flux en haut
+        ax_flux = self.ax_heatmap.twinx()
+        ax_flux.fill_between(X_mm, 0, Flux_MW, alpha=0.2, color='red')
+        ax_flux.plot(X_mm, Flux_MW, 'r-', linewidth=1, alpha=0.6)
+        ax_flux.set_ylabel('Flux (MW/m²)', color='red')
+        ax_flux.tick_params(axis='y', colors='red')
+        ax_flux.set_ylim(0, max(Flux_MW) * 3)
+        
+        self.ax_heatmap.set_xlabel('Position axiale X (mm)', color=self.text_primary)
+        self.ax_heatmap.set_ylabel('Profondeur dans la paroi (mm)', color=self.text_primary)
+        self.ax_heatmap.set_title('Carte Thermique Développée - Température dans la paroi', 
+                                  color=self.text_primary, fontsize=12, fontweight='bold')
+        
+        self.ax_heatmap.legend(loc='upper right', fontsize=8)
+        self.apply_dark_axes([self.ax_heatmap])
+        self.fig_heatmap.tight_layout()
+
+    def draw_heatmap_3d_surface(self):
+        """Dessine une surface 3D de la température sur la tuyère."""
+        from mpl_toolkits.mplot3d import Axes3D
+        
+        self.fig_heatmap.clear()
+        self.ax_heatmap = self.fig_heatmap.add_subplot(111, projection='3d')
+        
+        profile = self.results["thermal_profile"]
+        X_mm = np.array(profile["X_mm"])
+        Y_mm = np.array(profile["Y_mm"])
+        T_wall_hot = np.array(profile["T_wall_hot"])
+        
+        # Créer la surface de révolution
+        n_theta = int(self.heatmap_resolution.get())
+        theta = np.linspace(0, 2*np.pi, n_theta)
+        
+        THETA, X = np.meshgrid(theta, X_mm)
+        R = np.tile(Y_mm.reshape(-1, 1), (1, n_theta))
+        T = np.tile(T_wall_hot.reshape(-1, 1), (1, n_theta))
+        
+        Y_3d = R * np.cos(THETA)
+        Z_3d = R * np.sin(THETA)
+        
+        # Normaliser les températures pour le colormap
+        cmap = self.heatmap_cmap.get()
+        norm = plt.Normalize(vmin=min(T_wall_hot), vmax=max(T_wall_hot))
+        
+        surf = self.ax_heatmap.plot_surface(X, Y_3d, Z_3d, facecolors=plt.cm.get_cmap(cmap)(norm(T)),
+                                             shade=True, alpha=0.9, antialiased=True)
+        
+        # Barre de couleur
+        mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array(T)
+        cbar = self.fig_heatmap.colorbar(mappable, ax=self.ax_heatmap, label='T paroi hot (K)', 
+                                          shrink=0.6, pad=0.1)
+        cbar.ax.yaxis.label.set_color(self.text_primary)
+        cbar.ax.tick_params(colors=self.text_primary)
+        
+        # Configuration 3D
+        self.ax_heatmap.set_xlabel('X (mm)', color=self.text_primary)
+        self.ax_heatmap.set_ylabel('Y (mm)', color=self.text_primary)
+        self.ax_heatmap.set_zlabel('Z (mm)', color=self.text_primary)
+        self.ax_heatmap.set_title('Surface 3D - Température paroi côté gaz', 
+                                  color=self.text_primary, fontsize=12, fontweight='bold')
+        
+        # Style sombre pour 3D
+        self.ax_heatmap.set_facecolor(self.bg_surface)
+        self.ax_heatmap.xaxis.pane.fill = False
+        self.ax_heatmap.yaxis.pane.fill = False
+        self.ax_heatmap.zaxis.pane.fill = False
+        self.ax_heatmap.tick_params(colors=self.text_primary)
+        
+        self.fig_heatmap.tight_layout()
+
+    def update_heatmap_info(self, x_pos, t_gas, t_hot, t_cold, t_coolant, flux):
+        """Met à jour les labels d'information de la carte thermique."""
+        hg = profile["hg_throat"] if "hg_throat" in (profile := self.results.get("thermal_profile", {})) else 0
+        
+        self.heatmap_info_labels["T_gaz"].config(text=f"{t_gas:.0f} K")
+        self.heatmap_info_labels["T_hot"].config(text=f"{t_hot:.0f} K")
+        self.heatmap_info_labels["T_cold"].config(text=f"{t_cold:.0f} K")
+        self.heatmap_info_labels["T_cool"].config(text=f"{t_coolant:.0f} K")
+        self.heatmap_info_labels["flux"].config(text=f"{flux:.2f} MW/m²")
+        self.heatmap_info_labels["hg"].config(text=f"{hg:.0f} W/m²K")
+
+    def on_heatmap_hover(self, event):
+        """Gère le survol de la carte thermique pour afficher les infos."""
+        if event.inaxes != self.ax_heatmap or self.heatmap_data is None:
+            return
+        
+        # En mode coupe radiale, calculer la température à partir de la position
+        if self.heatmap_mode.get() == "coupe_radiale":
+            x, y = event.xdata, event.ydata
+            r = np.sqrt(x**2 + y**2)
+            data = self.heatmap_data
+            
+            if data["r_inner"] <= r <= data["r_outer"]:
+                # Interpoler la température
+                wall_thickness = data["r_outer"] - data["r_inner"]
+                depth = r - data["r_inner"]
+                t_local = data["t_hot"] + (data["t_cold"] - data["t_hot"]) * depth / wall_thickness
+                
+                # Mettre à jour le titre avec l'info
+                self.ax_heatmap.set_title(
+                    f'Coupe @ X={data["x_pos"]:.1f}mm | r={r:.1f}mm | T={t_local:.0f}K | Flux={data["flux"]:.2f}MW/m²',
+                    color=self.text_primary, fontsize=11
+                )
+                self.canvas_heatmap.draw_idle()
+
+    def on_heatmap_click(self, event):
+        """Gère le clic sur la carte thermique."""
+        # Pourrait être étendu pour sélectionner un point et afficher plus de détails
+        pass
+
+    def init_cad_tab(self):
+        """Initialise l'onglet Export CAD 3D avec prévisualisation et canaux."""
+        # Barre d'accent
+        tk.Frame(self.tab_cad, height=4, bg="#9b59b6").pack(fill=tk.X)
+        
+        # Frame principale divisée en deux
+        main_frame = ttk.Frame(self.tab_cad)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Panneau de contrôles à gauche
+        ctrl_panel = ttk.LabelFrame(main_frame, text="🔧 Configuration Export CAD 3D", padding=10)
+        ctrl_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        
+        # Section: Géométrie de base
+        geo_frame = ttk.LabelFrame(ctrl_panel, text="Géométrie Tuyère", padding=5)
+        geo_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(geo_frame, text="Résolution angulaire:").grid(row=0, column=0, sticky="w", pady=2)
+        self.cad_n_theta = ttk.Spinbox(geo_frame, from_=16, to=360, width=8)
+        self.cad_n_theta.set(72)
+        self.cad_n_theta.grid(row=0, column=1, padx=5, pady=2)
+        ttk.Label(geo_frame, text="segments").grid(row=0, column=2, sticky="w")
+        
+        ttk.Label(geo_frame, text="Résolution axiale:").grid(row=1, column=0, sticky="w", pady=2)
+        self.cad_n_axial = ttk.Spinbox(geo_frame, from_=50, to=500, width=8)
+        self.cad_n_axial.set(100)
+        self.cad_n_axial.grid(row=1, column=1, padx=5, pady=2)
+        ttk.Label(geo_frame, text="points").grid(row=1, column=2, sticky="w")
+        
+        # Section: Paroi et canaux
+        wall_frame = ttk.LabelFrame(ctrl_panel, text="Paroi & Canaux de Refroidissement", padding=5)
+        wall_frame.pack(fill=tk.X, pady=5)
+        
+        self.cad_include_wall = tk.BooleanVar(value=True)
+        ttk.Checkbutton(wall_frame, text="Inclure épaisseur paroi", variable=self.cad_include_wall,
+                       command=self.update_cad_preview).grid(row=0, column=0, columnspan=2, sticky="w")
+        
+        self.cad_include_channels = tk.BooleanVar(value=True)
+        ttk.Checkbutton(wall_frame, text="Inclure canaux de refroidissement", variable=self.cad_include_channels,
+                       command=self.update_cad_preview).grid(row=1, column=0, columnspan=2, sticky="w")
+        
+        ttk.Label(wall_frame, text="Nombre de canaux:").grid(row=2, column=0, sticky="w", pady=2)
+        self.cad_n_channels = ttk.Spinbox(wall_frame, from_=8, to=200, width=8)
+        self.cad_n_channels.set(48)
+        self.cad_n_channels.grid(row=2, column=1, padx=5, pady=2)
+        
+        ttk.Label(wall_frame, text="Largeur canal (mm):").grid(row=3, column=0, sticky="w", pady=2)
+        self.cad_channel_width = ttk.Spinbox(wall_frame, from_=0.5, to=10, increment=0.5, width=8)
+        self.cad_channel_width.set(2.0)
+        self.cad_channel_width.grid(row=3, column=1, padx=5, pady=2)
+        
+        ttk.Label(wall_frame, text="Profondeur canal (mm):").grid(row=4, column=0, sticky="w", pady=2)
+        self.cad_channel_depth = ttk.Spinbox(wall_frame, from_=0.5, to=15, increment=0.5, width=8)
+        self.cad_channel_depth.set(3.0)
+        self.cad_channel_depth.grid(row=4, column=1, padx=5, pady=2)
+        
+        ttk.Label(wall_frame, text="Type de canaux:").grid(row=5, column=0, sticky="w", pady=2)
+        self.cad_channel_type = ttk.Combobox(wall_frame, values=["Axiaux", "Hélicoïdaux", "Bifurcation"], 
+                                              state="readonly", width=12)
+        self.cad_channel_type.set("Axiaux")
+        self.cad_channel_type.grid(row=5, column=1, padx=5, pady=2)
+        
+        # Section: Options export
+        export_frame = ttk.LabelFrame(ctrl_panel, text="Options d'Export", padding=5)
+        export_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(export_frame, text="Format:").grid(row=0, column=0, sticky="w", pady=2)
+        self.cad_format = ttk.Combobox(export_frame, values=["STEP (CAD)", "STL (Mesh)", "DXF (Profil)"], 
+                                        state="readonly", width=15)
+        self.cad_format.set("STEP (CAD)")
+        self.cad_format.grid(row=0, column=1, padx=5, pady=2)
+        
+        ttk.Label(export_frame, text="Unités:").grid(row=1, column=0, sticky="w", pady=2)
+        self.cad_units = ttk.Combobox(export_frame, values=["mm", "m", "inch"], state="readonly", width=15)
+        self.cad_units.set("mm")
+        self.cad_units.grid(row=1, column=1, padx=5, pady=2)
+        
+        self.cad_export_separate = tk.BooleanVar(value=False)
+        ttk.Checkbutton(export_frame, text="Exporter paroi et canaux séparément", 
+                       variable=self.cad_export_separate).grid(row=2, column=0, columnspan=2, sticky="w")
+        
+        # Boutons d'action
+        btn_frame = ttk.Frame(ctrl_panel)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(btn_frame, text="🔄 Prévisualiser", command=self.update_cad_preview).pack(fill=tk.X, pady=2)
+        ttk.Button(btn_frame, text="📐 Exporter STEP", command=self.export_step).pack(fill=tk.X, pady=2)
+        ttk.Button(btn_frame, text="💾 Exporter STL", command=self.export_stl).pack(fill=tk.X, pady=2)
+        ttk.Button(btn_frame, text="📏 Exporter DXF", command=self.export_dxf).pack(fill=tk.X, pady=2)
+        
+        # Informations
+        info_frame = ttk.LabelFrame(ctrl_panel, text="📊 Informations Modèle", padding=5)
+        info_frame.pack(fill=tk.X, pady=5)
+        
+        self.cad_info_labels = {}
+        info_items = [("vertices", "Vertices:"), ("faces", "Faces:"), ("volume", "Volume:"), 
+                      ("surface", "Surface:"), ("mass", "Masse estimée:")]
+        for i, (key, text) in enumerate(info_items):
+            ttk.Label(info_frame, text=text).grid(row=i, column=0, sticky="w", pady=1)
+            lbl = ttk.Label(info_frame, text="---", foreground=self.accent)
+            lbl.grid(row=i, column=1, sticky="e", padx=10)
+            self.cad_info_labels[key] = lbl
+        
+        # Panneau de prévisualisation 3D à droite
+        preview_frame = ttk.LabelFrame(main_frame, text="🎨 Prévisualisation 3D", padding=5)
+        preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        self.fig_cad = plt.Figure(figsize=(8, 6), dpi=100)
+        self.fig_cad.patch.set_facecolor(self.bg_main)
+        self.ax_cad = self.fig_cad.add_subplot(111, projection='3d')
+        self.ax_cad.set_facecolor(self.bg_surface)
+        
+        self.canvas_cad = FigureCanvasTkAgg(self.fig_cad, master=preview_frame)
+        self.canvas_cad.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
+        self.canvas_cad.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Message initial
+        self.ax_cad.text2D(0.5, 0.5, "Calculez d'abord le moteur\npuis cliquez sur Prévisualiser", 
+                          transform=self.ax_cad.transAxes, ha='center', va='center', 
+                          fontsize=12, color=self.text_muted)
+
+    def update_cad_preview(self):
+        """Met à jour la prévisualisation 3D du modèle CAD."""
+        if not hasattr(self, 'ax_cad'):
+            return
+            
+        self.fig_cad.clear()
+        self.ax_cad = self.fig_cad.add_subplot(111, projection='3d')
+        
+        if not self.results or not self.geometry_profile:
+            self.ax_cad.text2D(0.5, 0.5, "Calculez d'abord le moteur\n(bouton CALCULER)", 
+                              transform=self.ax_cad.transAxes, ha='center', va='center', 
+                              fontsize=12, color=self.text_muted)
+            self.canvas_cad.draw()
+            return
+        
+        X_profile, Y_profile = self.geometry_profile
+        X_mm = np.array(X_profile)
+        R_inner = np.array(Y_profile)  # Rayon intérieur
+        
+        wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+        R_outer = R_inner + wall_thickness  # Rayon extérieur
+        
+        n_theta = int(self.cad_n_theta.get())
+        theta = np.linspace(0, 2*np.pi, n_theta)
+        
+        # Créer les surfaces
+        THETA, X = np.meshgrid(theta, X_mm)
+        
+        # Surface intérieure (côté gaz)
+        R_in_grid = np.tile(R_inner.reshape(-1, 1), (1, n_theta))
+        Y_in = R_in_grid * np.cos(THETA)
+        Z_in = R_in_grid * np.sin(THETA)
+        
+        # Surface extérieure (côté coolant)
+        if self.cad_include_wall.get():
+            R_out_grid = np.tile(R_outer.reshape(-1, 1), (1, n_theta))
+            Y_out = R_out_grid * np.cos(THETA)
+            Z_out = R_out_grid * np.sin(THETA)
+        
+        # Tracer surface intérieure
+        surf_in = self.ax_cad.plot_surface(X, Y_in, Z_in, alpha=0.7, color=self.accent, 
+                                            edgecolor='none', shade=True)
+        
+        # Tracer surface extérieure
+        if self.cad_include_wall.get():
+            surf_out = self.ax_cad.plot_surface(X, Y_out, Z_out, alpha=0.4, color='#00ff88', 
+                                                 edgecolor='none', shade=True)
+        
+        # Tracer les canaux de refroidissement
+        if self.cad_include_channels.get() and self.cad_include_wall.get():
+            n_channels = int(self.cad_n_channels.get())
+            channel_width_mm = float(self.cad_channel_width.get())
+            channel_depth_mm = float(self.cad_channel_depth.get())
+            
+            # Position angulaire des canaux
+            channel_angles = np.linspace(0, 2*np.pi, n_channels, endpoint=False)
+            
+            for angle in channel_angles:
+                # Fond du canal
+                r_channel = R_inner + wall_thickness - channel_depth_mm
+                x_ch = X_mm
+                y_ch = r_channel * np.cos(angle)
+                z_ch = r_channel * np.sin(angle)
+                self.ax_cad.plot(x_ch, y_ch, z_ch, 'b-', linewidth=0.5, alpha=0.6)
+        
+        # Configuration 3D
+        self.ax_cad.set_xlabel('X (mm)', color=self.text_primary)
+        self.ax_cad.set_ylabel('Y (mm)', color=self.text_primary)
+        self.ax_cad.set_zlabel('Z (mm)', color=self.text_primary)
+        self.ax_cad.set_title(f"Modèle 3D - {self.get_val('name')}", color=self.text_primary, fontweight='bold')
+        
+        # Style sombre
+        self.ax_cad.set_facecolor(self.bg_surface)
+        self.ax_cad.xaxis.pane.fill = False
+        self.ax_cad.yaxis.pane.fill = False
+        self.ax_cad.zaxis.pane.fill = False
+        self.ax_cad.tick_params(colors=self.text_primary)
+        
+        # Égaliser les axes
+        max_range = max(max(X_mm) - min(X_mm), 2 * max(R_outer)) / 2
+        mid_x = (max(X_mm) + min(X_mm)) / 2
+        self.ax_cad.set_xlim(mid_x - max_range, mid_x + max_range)
+        self.ax_cad.set_ylim(-max_range, max_range)
+        self.ax_cad.set_zlim(-max_range, max_range)
+        
+        self.fig_cad.tight_layout()
+        self.canvas_cad.draw()
+        
+        # Mettre à jour les infos
+        self.update_cad_info()
+
+    def update_cad_info(self):
+        """Met à jour les informations du modèle CAD."""
+        if not self.results or not self.geometry_profile:
+            return
+        
+        X_profile, Y_profile = self.geometry_profile
+        R_inner = np.array(Y_profile)
+        wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+        R_outer = R_inner + wall_thickness
+        
+        n_theta = int(self.cad_n_theta.get())
+        n_axial = len(X_profile)
+        
+        # Calcul approximatif
+        n_vertices = n_axial * n_theta * 2  # Inner + outer
+        n_faces = (n_axial - 1) * n_theta * 2 * 2  # Quads -> triangles
+        
+        # Volume approximatif (intégration)
+        volume = 0
+        for i in range(len(X_profile) - 1):
+            dx = abs(X_profile[i+1] - X_profile[i])
+            r_in_avg = (R_inner[i] + R_inner[i+1]) / 2
+            r_out_avg = (R_outer[i] + R_outer[i+1]) / 2
+            volume += np.pi * (r_out_avg**2 - r_in_avg**2) * dx  # mm³
+        
+        volume_cm3 = volume / 1000  # cm³
+        
+        # Surface
+        surface = self.results.get("A_cooled", 0) * 1e6  # mm²
+        
+        # Masse (estimation avec cuivre: 8.96 g/cm³)
+        density = 8.96  # g/cm³ pour cuivre
+        mass = volume_cm3 * density  # g
+        
+        self.cad_info_labels["vertices"].config(text=f"{n_vertices:,}")
+        self.cad_info_labels["faces"].config(text=f"{n_faces:,}")
+        self.cad_info_labels["volume"].config(text=f"{volume_cm3:.1f} cm³")
+        self.cad_info_labels["surface"].config(text=f"{surface:.0f} mm²")
+        self.cad_info_labels["mass"].config(text=f"{mass:.0f} g ({mass/1000:.2f} kg)")
+
+    def export_stl(self):
+        """Exporte le modèle 3D au format STL."""
+        if not self.results or not self.geometry_profile:
+            messagebox.showwarning("Attention", "Calculez d'abord le moteur!")
+            return
+        
+        if not HAS_NUMPY_STL:
+            messagebox.showwarning("Attention", 
+                "Module numpy-stl non installé.\n\nInstallez-le avec:\npip install numpy-stl")
+            return
+        
+        f = filedialog.asksaveasfilename(defaultextension=".stl", 
+                                          filetypes=[("STL files", "*.stl")],
+                                          initialfilename=f"{self.get_val('name')}_nozzle.stl")
+        if not f:
+            return
+        
+        try:
+            X_profile, Y_profile = self.geometry_profile
+            X_mm = np.array(X_profile)
+            R_inner = np.array(Y_profile)
+            wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+            R_outer = R_inner + wall_thickness
+            
+            n_theta = int(self.cad_n_theta.get())
+            theta = np.linspace(0, 2*np.pi, n_theta)
+            
+            n_axial = len(X_mm)
+            
+            # Générer les vertices pour surface intérieure
+            vertices_inner = []
+            for i, x in enumerate(X_mm):
+                for t in theta:
+                    y = R_inner[i] * np.cos(t)
+                    z = R_inner[i] * np.sin(t)
+                    vertices_inner.append([x, y, z])
+            vertices_inner = np.array(vertices_inner)
+            
+            # Générer les vertices pour surface extérieure
+            vertices_outer = []
+            for i, x in enumerate(X_mm):
+                for t in theta:
+                    y = R_outer[i] * np.cos(t)
+                    z = R_outer[i] * np.sin(t)
+                    vertices_outer.append([x, y, z])
+            vertices_outer = np.array(vertices_outer)
+            
+            # Combiner les vertices
+            all_vertices = np.vstack([vertices_inner, vertices_outer])
+            n_inner = len(vertices_inner)
+            
+            # Générer les faces (triangles)
+            faces = []
+            
+            # Faces surface intérieure (normales vers l'intérieur)
+            for i in range(n_axial - 1):
+                for j in range(n_theta - 1):
+                    v0 = i * n_theta + j
+                    v1 = i * n_theta + j + 1
+                    v2 = (i + 1) * n_theta + j
+                    v3 = (i + 1) * n_theta + j + 1
+                    # Triangle 1
+                    faces.append([v0, v2, v1])
+                    # Triangle 2
+                    faces.append([v1, v2, v3])
+            
+            # Faces surface extérieure (normales vers l'extérieur)
+            for i in range(n_axial - 1):
+                for j in range(n_theta - 1):
+                    v0 = n_inner + i * n_theta + j
+                    v1 = n_inner + i * n_theta + j + 1
+                    v2 = n_inner + (i + 1) * n_theta + j
+                    v3 = n_inner + (i + 1) * n_theta + j + 1
+                    # Triangle 1
+                    faces.append([v0, v1, v2])
+                    # Triangle 2
+                    faces.append([v1, v3, v2])
+            
+            # Faces de fermeture aux extrémités
+            # Entrée (chambre)
+            for j in range(n_theta - 1):
+                v_in = j
+                v_in_next = j + 1
+                v_out = n_inner + j
+                v_out_next = n_inner + j + 1
+                faces.append([v_in, v_in_next, v_out])
+                faces.append([v_in_next, v_out_next, v_out])
+            
+            # Sortie (divergent)
+            base_in = (n_axial - 1) * n_theta
+            base_out = n_inner + (n_axial - 1) * n_theta
+            for j in range(n_theta - 1):
+                v_in = base_in + j
+                v_in_next = base_in + j + 1
+                v_out = base_out + j
+                v_out_next = base_out + j + 1
+                faces.append([v_in, v_out, v_in_next])
+                faces.append([v_in_next, v_out, v_out_next])
+            
+            faces = np.array(faces)
+            
+            # Créer le mesh STL
+            nozzle_mesh = stl_mesh.Mesh(np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype))
+            for i, face in enumerate(faces):
+                for j in range(3):
+                    nozzle_mesh.vectors[i][j] = all_vertices[face[j]]
+            
+            # Sauvegarder
+            nozzle_mesh.save(f)
+            
+            messagebox.showinfo("Succès", f"Fichier STL exporté:\n{f}\n\n"
+                               f"Vertices: {len(all_vertices)}\nFaces: {len(faces)}")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l'export STL:\n{e}")
+
+    def export_step(self):
+        """Exporte le modèle 3D au format STEP (solide paramétrique)."""
+        if not self.results or not self.geometry_profile:
+            messagebox.showwarning("Attention", "Calculez d'abord le moteur!")
+            return
+        
+        # Vérifier si CadQuery est disponible
+        if HAS_CADQUERY:
+            self._export_step_cadquery()
+        else:
+            # Proposer des alternatives
+            result = messagebox.askyesno("Export STEP", 
+                "CadQuery n'est pas installé.\n\n"
+                "Pour l'installer:\n"
+                "  py -3.10 -m pip install cadquery-ocp\n\n"
+                "Voulez-vous exporter en format DXF à la place?\n"
+                "(Le DXF peut être importé dans Fusion 360/SolidWorks\n"
+                "et utilisé pour créer un solide de révolution)")
+            if result:
+                self._export_dxf_for_cad()
+
+    def _export_step_cadquery(self):
+        """Export STEP via CadQuery."""
+        f = filedialog.asksaveasfilename(defaultextension=".step", 
+                                          filetypes=[("STEP files", "*.step"), ("STEP files", "*.stp")],
+                                          initialfilename=f"{self.get_val('name')}_nozzle.step")
+        if not f:
+            return
+        
+        try:
+            X_profile, Y_profile = self.geometry_profile
+            X_mm = np.array(X_profile)
+            R_inner = np.array(Y_profile)
+            wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+            R_outer = R_inner + wall_thickness
+            
+            # Créer le profil de révolution
+            inner_points = [(X_mm[i], R_inner[i]) for i in range(len(X_mm))]
+            outer_points = [(X_mm[i], R_outer[i]) for i in range(len(X_mm)-1, -1, -1)]
+            all_points = inner_points + outer_points
+            all_points.append(inner_points[0])
+            
+            profile = cq.Workplane("XZ")
+            profile = profile.moveTo(all_points[0][0], all_points[0][1])
+            for pt in all_points[1:]:
+                profile = profile.lineTo(pt[0], pt[1])
+            profile = profile.close()
+            
+            nozzle = profile.revolve(360, (0, 0, 0), (1, 0, 0))
+            cq.exporters.export(nozzle, f)
+            
+            messagebox.showinfo("Succès", f"Fichier STEP exporté:\n{f}")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur export STEP:\n{e}")
+
+    def _export_dxf_for_cad(self):
+        """Exporte un DXF optimisé pour import CAD (profil de révolution)."""
+        if not HAS_EZDXF:
+            messagebox.showwarning("Attention", "Module ezdxf non installé.\npip install ezdxf")
+            return
+        
+        f = filedialog.asksaveasfilename(defaultextension=".dxf", 
+                                          filetypes=[("DXF files", "*.dxf")],
+                                          initialfilename=f"{self.get_val('name')}_profile_CAD.dxf")
+        if not f:
+            return
+        
+        try:
+            X_profile, Y_profile = self.geometry_profile
+            X_mm = np.array(X_profile)
+            R_inner = np.array(Y_profile)
+            wall_thickness = self.results.get("wall_thickness_mm", 3.0)
+            R_outer = R_inner + wall_thickness
+            
+            # Créer le document DXF
+            doc = ezdxf.new('R2010')
+            msp = doc.modelspace()
+            
+            # Profil fermé pour révolution
+            # Layer pour le profil de révolution
+            doc.layers.add("PROFILE_REVOLUTION", color=1)  # Rouge
+            doc.layers.add("AXE_REVOLUTION", color=5)      # Bleu
+            doc.layers.add("DIMENSIONS", color=3)          # Vert
+            
+            # Tracer l'axe de révolution (ligne centrale)
+            msp.add_line((X_mm[0] - 10, 0), (X_mm[-1] + 10, 0), 
+                        dxfattribs={"layer": "AXE_REVOLUTION", "linetype": "CENTER"})
+            
+            # Créer le profil fermé (polyline)
+            # Intérieur: de gauche à droite
+            points = []
+            for i in range(len(X_mm)):
+                points.append((X_mm[i], R_inner[i]))
+            
+            # Extérieur: de droite à gauche
+            for i in range(len(X_mm)-1, -1, -1):
+                points.append((X_mm[i], R_outer[i]))
+            
+            # Fermer le profil
+            points.append(points[0])
+            
+            # Ajouter la polyline fermée
+            msp.add_lwpolyline(points, dxfattribs={"layer": "PROFILE_REVOLUTION"}, close=True)
+            
+            # Ajouter des dimensions clés
+            # Diamètre col
+            idx_throat = np.argmin(R_inner)
+            x_throat = X_mm[idx_throat]
+            r_throat = R_inner[idx_throat]
+            
+            msp.add_text(f"Ø Col = {2*r_throat:.2f} mm", 
+                        dxfattribs={"layer": "DIMENSIONS", "height": 2}).set_placement((x_throat, -5))
+            
+            # Diamètre sortie
+            msp.add_text(f"Ø Sortie = {2*R_inner[-1]:.2f} mm",
+                        dxfattribs={"layer": "DIMENSIONS", "height": 2}).set_placement((X_mm[-1], -5))
+            
+            # Épaisseur paroi
+            msp.add_text(f"Épaisseur = {wall_thickness:.2f} mm",
+                        dxfattribs={"layer": "DIMENSIONS", "height": 2}).set_placement((X_mm[0], R_outer[0] + 5))
+            
+            # Instructions
+            msp.add_text("INSTRUCTIONS: Importer dans CAD, sélectionner PROFILE_REVOLUTION,",
+                        dxfattribs={"layer": "DIMENSIONS", "height": 1.5}).set_placement((X_mm[0], -15))
+            msp.add_text("faire Revolve 360° autour de l'axe AXE_REVOLUTION",
+                        dxfattribs={"layer": "DIMENSIONS", "height": 1.5}).set_placement((X_mm[0], -18))
+            
+            doc.saveas(f)
+            
+            messagebox.showinfo("Succès", 
+                f"Fichier DXF exporté:\n{f}\n\n"
+                f"📌 INSTRUCTIONS:\n"
+                f"1. Importer dans Fusion 360 / SolidWorks\n"
+                f"2. Sélectionner le profil fermé (layer PROFILE_REVOLUTION)\n"
+                f"3. Utiliser l'outil 'Revolve' (360°)\n"
+                f"4. Axe = ligne centrale (layer AXE_REVOLUTION)\n\n"
+                f"Cela créera un solide 3D paramétrique!")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur export DXF:\n{e}")
+
+    # =====================================================================
+    # ONGLET OPTIMISEUR AUTOMATIQUE
+    # =====================================================================
+    def init_optimizer_tab(self):
+        """Initialise l'onglet Optimiseur avec paramètres, contraintes et algorithmes."""
+        # Barre d'accent orange
+        tk.Frame(self.tab_optimizer, height=4, bg="#e67e22").pack(fill=tk.X)
+        
+        # Frame principale avec scroll
+        main_canvas = tk.Canvas(self.tab_optimizer, bg=self.bg_main, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.tab_optimizer, orient="vertical", command=main_canvas.yview)
+        scroll_frame = ttk.Frame(main_canvas)
+        
+        scroll_frame.bind("<Configure>", lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all")))
+        main_canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Titre
+        header = ttk.Frame(scroll_frame)
+        header.pack(fill=tk.X, pady=(5, 10))
+        ttk.Label(header, text="⚙️ Optimiseur Automatique de Design", 
+                  font=("Segoe UI", 14, "bold"), foreground=self.accent).pack(side=tk.LEFT)
+        ttk.Label(header, text="Trouve la configuration optimale selon vos objectifs et contraintes",
+                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
+        
+        # Section: Objectif d'optimisation
+        obj_frame = ttk.LabelFrame(scroll_frame, text="🎯 Objectif d'Optimisation", padding=10)
+        obj_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        self.optim_objective = tk.StringVar(value="min_mass")
+        objectives = [
+            ("min_mass", "Minimiser la masse", "Réduit l'épaisseur de paroi tout en respectant les contraintes thermiques"),
+            ("min_dp", "Minimiser Δp", "Optimise la géométrie des canaux pour réduire les pertes de charge"),
+            ("max_margin", "Maximiser marge thermique", "Augmente l'écart entre T_paroi et T_fusion du matériau"),
+            ("multi", "Multi-objectif (Pareto)", "Équilibre entre masse, Δp et marge thermique")
+        ]
+        
+        for i, (value, text, desc) in enumerate(objectives):
+            frame = ttk.Frame(obj_frame)
+            frame.pack(fill=tk.X, pady=2)
+            ttk.Radiobutton(frame, text=text, variable=self.optim_objective, value=value).pack(side=tk.LEFT)
+            ttk.Label(frame, text=f"  - {desc}", foreground=self.text_muted).pack(side=tk.LEFT, padx=10)
+        
+        # Section: Variables de design
+        vars_frame = ttk.LabelFrame(scroll_frame, text="📐 Variables de Design (plages de recherche)", padding=10)
+        vars_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        # Tableau des variables
+        headers = ["Variable", "Min", "Max", "Pas", "Actif"]
+        for col, h in enumerate(headers):
+            ttk.Label(vars_frame, text=h, font=("Segoe UI", 10, "bold")).grid(row=0, column=col, padx=5, pady=2)
+        
+        self.optim_vars = {}
+        design_vars = [
+            ("wall_thickness", "Épaisseur paroi (mm)", 1.0, 10.0, 0.5),
+            ("channel_depth", "Profondeur canaux (mm)", 1.0, 8.0, 0.5),
+            ("channel_width", "Largeur canaux (mm)", 0.5, 5.0, 0.25),
+            ("n_channels", "Nombre de canaux", 16, 120, 4),
+            ("coolant_velocity", "Vitesse coolant (m/s)", 5.0, 50.0, 2.5),
+            ("inlet_pressure", "Pression entrée (bar)", 20.0, 100.0, 5.0),
+        ]
+        
+        for row, (key, label, vmin, vmax, step) in enumerate(design_vars, start=1):
+            self.optim_vars[key] = {
+                "active": tk.BooleanVar(value=True if row <= 3 else False),
+                "min": tk.DoubleVar(value=vmin),
+                "max": tk.DoubleVar(value=vmax),
+                "step": tk.DoubleVar(value=step)
+            }
+            
+            ttk.Label(vars_frame, text=label).grid(row=row, column=0, sticky="w", padx=5, pady=2)
+            ttk.Entry(vars_frame, textvariable=self.optim_vars[key]["min"], width=8).grid(row=row, column=1, padx=5)
+            ttk.Entry(vars_frame, textvariable=self.optim_vars[key]["max"], width=8).grid(row=row, column=2, padx=5)
+            ttk.Entry(vars_frame, textvariable=self.optim_vars[key]["step"], width=8).grid(row=row, column=3, padx=5)
+            ttk.Checkbutton(vars_frame, variable=self.optim_vars[key]["active"]).grid(row=row, column=4, padx=5)
+        
+        # Section: Contraintes
+        constr_frame = ttk.LabelFrame(scroll_frame, text="⚠️ Contraintes (ne pas dépasser)", padding=10)
+        constr_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        self.optim_constraints = {}
+        constraints = [
+            ("T_wall_max", "T paroi max (K)", 800, "K", "Température maximale admissible de la paroi chaude"),
+            ("dp_max", "Δp max (bar)", 15.0, "bar", "Perte de charge maximale dans le circuit de refroidissement"),
+            ("margin_min", "Marge thermique min (%)", 15, "%", "Marge minimale entre T_paroi et T_fusion"),
+            ("velocity_max", "Vitesse coolant max (m/s)", 60, "m/s", "Pour éviter cavitation et érosion"),
+        ]
+        
+        for row, (key, label, default, unit, tooltip) in enumerate(constraints):
+            self.optim_constraints[key] = {
+                "value": tk.DoubleVar(value=default),
+                "active": tk.BooleanVar(value=True)
+            }
+            
+            frame = ttk.Frame(constr_frame)
+            frame.pack(fill=tk.X, pady=2)
+            ttk.Checkbutton(frame, variable=self.optim_constraints[key]["active"]).pack(side=tk.LEFT)
+            ttk.Label(frame, text=label, width=20).pack(side=tk.LEFT)
+            ttk.Entry(frame, textvariable=self.optim_constraints[key]["value"], width=10).pack(side=tk.LEFT, padx=5)
+            ttk.Label(frame, text=unit, width=5).pack(side=tk.LEFT)
+            ttk.Label(frame, text=f"  ({tooltip})", foreground=self.text_muted).pack(side=tk.LEFT, padx=10)
+        
+        # Section: Algorithme
+        algo_frame = ttk.LabelFrame(scroll_frame, text="🧮 Algorithme d'Optimisation", padding=10)
+        algo_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        row1 = ttk.Frame(algo_frame)
+        row1.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(row1, text="Méthode:").pack(side=tk.LEFT)
+        self.optim_algorithm = ttk.Combobox(row1, values=[
+            "Grid Search (exhaustif)",
+            "Gradient Descent (SLSQP)",
+            "Algorithme Génétique",
+            "Differential Evolution",
+            "Bayesian Optimization",
+            "Nelder-Mead (Simplex)"
+        ], state="readonly", width=25)
+        self.optim_algorithm.set("Differential Evolution")
+        self.optim_algorithm.pack(side=tk.LEFT, padx=10)
+        
+        ttk.Label(row1, text="Max itérations:").pack(side=tk.LEFT, padx=(20, 5))
+        self.optim_max_iter = ttk.Spinbox(row1, from_=10, to=1000, width=8)
+        self.optim_max_iter.set(100)
+        self.optim_max_iter.pack(side=tk.LEFT)
+        
+        row2 = ttk.Frame(algo_frame)
+        row2.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(row2, text="Tolérance:").pack(side=tk.LEFT)
+        self.optim_tolerance = ttk.Entry(row2, width=10)
+        self.optim_tolerance.insert(0, "1e-4")
+        self.optim_tolerance.pack(side=tk.LEFT, padx=10)
+        
+        ttk.Label(row2, text="Population (GA/DE):").pack(side=tk.LEFT, padx=(20, 5))
+        self.optim_population = ttk.Spinbox(row2, from_=10, to=200, width=8)
+        self.optim_population.set(50)
+        self.optim_population.pack(side=tk.LEFT)
+        
+        self.optim_parallel = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="Calcul parallèle", variable=self.optim_parallel).pack(side=tk.LEFT, padx=20)
+        
+        # Section: Boutons d'action
+        action_frame = ttk.Frame(scroll_frame)
+        action_frame.pack(fill=tk.X, pady=10, padx=5)
+        
+        self.btn_run_optim = ttk.Button(action_frame, text="▶ Lancer l'Optimisation", 
+                                         command=self.run_optimization, style="Accent.TButton")
+        self.btn_run_optim.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(action_frame, text="⏹ Arrêter", command=self.stop_optimization).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="📊 Exporter Résultats", command=self.export_optimization_results).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="📋 Appliquer Meilleur", command=self.apply_best_config).pack(side=tk.LEFT, padx=5)
+        
+        # Barre de progression
+        prog_frame = ttk.Frame(scroll_frame)
+        prog_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        ttk.Label(prog_frame, text="Progression:").pack(side=tk.LEFT)
+        self.optim_progress = ttk.Progressbar(prog_frame, mode="determinate", length=400)
+        self.optim_progress.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
+        self.optim_progress_label = ttk.Label(prog_frame, text="0%", foreground=self.accent)
+        self.optim_progress_label.pack(side=tk.LEFT)
+        
+        # Section: Résultats
+        results_frame = ttk.LabelFrame(scroll_frame, text="📈 Résultats d'Optimisation", padding=10)
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
+        
+        # Tableau des résultats (Treeview)
+        cols = ("rank", "wall_t", "ch_depth", "ch_width", "n_ch", "T_wall", "dp", "margin", "mass", "score")
+        self.optim_tree = ttk.Treeview(results_frame, columns=cols, show="headings", height=10)
+        
+        col_names = ["#", "Épaisseur", "Prof. Can.", "Larg. Can.", "N Can.", "T Paroi", "Δp", "Marge", "Masse", "Score"]
+        col_widths = [40, 80, 80, 80, 60, 80, 60, 60, 70, 70]
+        
+        for col, name, width in zip(cols, col_names, col_widths):
+            self.optim_tree.heading(col, text=name)
+            self.optim_tree.column(col, width=width, anchor="center")
+        
+        scrollbar_tree = ttk.Scrollbar(results_frame, orient="vertical", command=self.optim_tree.yview)
+        self.optim_tree.configure(yscrollcommand=scrollbar_tree.set)
+        
+        self.optim_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Graphique de convergence
+        conv_frame = ttk.LabelFrame(scroll_frame, text="📉 Convergence", padding=5)
+        conv_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        self.fig_optim = plt.Figure(figsize=(10, 3), dpi=100)
+        self.fig_optim.patch.set_facecolor(self.bg_main)
+        self.ax_optim = self.fig_optim.add_subplot(111)
+        self.ax_optim.set_facecolor(self.bg_surface)
+        
+        self.canvas_optim = FigureCanvasTkAgg(self.fig_optim, master=conv_frame)
+        self.canvas_optim.get_tk_widget().pack(fill=tk.X, expand=True)
+        
+        # Initialiser le flag d'arrêt
+        self.optim_running = False
+        self.optim_stop_flag = False
+        
+        # Dessiner un placeholder
+        self.ax_optim.text(0.5, 0.5, "Lancez une optimisation pour voir la convergence",
+                          transform=self.ax_optim.transAxes, ha='center', va='center',
+                          fontsize=10, color=self.text_muted)
+        self.ax_optim.set_xlabel("Itération", color=self.text_primary)
+        self.ax_optim.set_ylabel("Score", color=self.text_primary)
+        self.ax_optim.tick_params(colors=self.text_primary)
+        self.canvas_optim.draw()
+
+    def run_optimization(self):
+        """Lance le processus d'optimisation."""
+        if self.optim_running:
+            messagebox.showwarning("Attention", "Optimisation déjà en cours!")
+            return
+        
+        if not self.results:
+            messagebox.showwarning("Attention", "Calculez d'abord un design de base (bouton CALCULER)")
+            return
+        
+        # Collecter les variables actives
+        active_vars = {k: v for k, v in self.optim_vars.items() if v["active"].get()}
+        if not active_vars:
+            messagebox.showwarning("Attention", "Activez au moins une variable de design!")
+            return
+        
+        self.optim_running = True
+        self.optim_stop_flag = False
+        self.btn_run_optim.configure(state="disabled")
+        
+        # Nettoyer le tableau
+        for item in self.optim_tree.get_children():
+            self.optim_tree.delete(item)
+        
+        # Lancer dans un thread
+        import threading
+        thread = threading.Thread(target=self._optimization_worker, args=(active_vars,), daemon=True)
+        thread.start()
+
+    def _optimization_worker(self, active_vars):
+        """Worker thread pour l'optimisation."""
+        from scipy import optimize
+        
+        objective = self.optim_objective.get()
+        algorithm = self.optim_algorithm.get()
+        max_iter = int(self.optim_max_iter.get())
+        
+        # Définir les bornes
+        bounds = []
+        var_keys = list(active_vars.keys())
+        for key in var_keys:
+            vmin = active_vars[key]["min"].get()
+            vmax = active_vars[key]["max"].get()
+            bounds.append((vmin, vmax))
+        
+        # Historique pour convergence
+        self.optim_history = []
+        self.optim_results_list = []
+        
+        def objective_function(x):
+            """Fonction objectif à minimiser."""
+            if self.optim_stop_flag:
+                return float('inf')
+            
+            # Mapper x aux variables
+            config = {}
+            for i, key in enumerate(var_keys):
+                config[key] = x[i]
+            
+            # Évaluer le design avec cette config
+            score, metrics = self._evaluate_design(config)
+            
+            # Stocker le résultat
+            self.optim_results_list.append({
+                "config": config.copy(),
+                "metrics": metrics,
+                "score": score
+            })
+            
+            # Mettre à jour l'historique
+            self.optim_history.append(score)
+            
+            # Mise à jour UI (thread-safe)
+            progress = len(self.optim_history) / max_iter * 100
+            self.root.after(0, self._update_optim_progress, progress, score, config, metrics)
+            
+            return score
+        
+        try:
+            # Point initial
+            x0 = [(active_vars[k]["min"].get() + active_vars[k]["max"].get()) / 2 for k in var_keys]
+            
+            if "Grid Search" in algorithm:
+                # Grid search
+                self._grid_search(active_vars, var_keys, objective_function)
+            elif "Differential Evolution" in algorithm:
+                result = optimize.differential_evolution(
+                    objective_function, bounds,
+                    maxiter=max_iter,
+                    popsize=int(self.optim_population.get()),
+                    tol=float(self.optim_tolerance.get()),
+                    workers=1,
+                    updating='deferred'
+                )
+            elif "SLSQP" in algorithm or "Gradient" in algorithm:
+                result = optimize.minimize(
+                    objective_function, x0, method='SLSQP',
+                    bounds=bounds,
+                    options={'maxiter': max_iter}
+                )
+            elif "Nelder-Mead" in algorithm:
+                result = optimize.minimize(
+                    objective_function, x0, method='Nelder-Mead',
+                    options={'maxiter': max_iter}
+                )
+            else:
+                # Default to differential evolution
+                result = optimize.differential_evolution(
+                    objective_function, bounds,
+                    maxiter=max_iter
+                )
+            
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("Erreur", f"Erreur d'optimisation:\n{e}"))
+        
+        finally:
+            self.root.after(0, self._finalize_optimization)
+
+    def _evaluate_design(self, config):
+        """Évalue un design donné et retourne le score et les métriques."""
+        # Utiliser les valeurs de base du calcul actuel
+        base_results = self.results.copy()
+        
+        # Modifier selon la config
+        wall_t = config.get("wall_thickness", base_results.get("wall_thickness_mm", 3.0))
+        ch_depth = config.get("channel_depth", base_results.get("channel_depth_mm", 3.0))
+        ch_width = config.get("channel_width", base_results.get("channel_width_mm", 2.0))
+        n_ch = int(config.get("n_channels", base_results.get("n_channels", 48)))
+        v_coolant = config.get("coolant_velocity", base_results.get("coolant_velocity", 20.0))
+        
+        # Calcul simplifié des métriques (approximation)
+        # En réalité, il faudrait refaire le calcul thermique complet
+        
+        # Température paroi (approximation linéaire avec épaisseur)
+        T_wall_base = base_results.get("T_wall_hot", 600)
+        k_wall = base_results.get("wall_conductivity", 380)  # W/m.K cuivre
+        q_flux = base_results.get("q_flux_max", 10e6)  # W/m²
+        
+        # T_wall augmente avec l'épaisseur
+        delta_T = q_flux * (wall_t / 1000) / k_wall
+        T_wall = base_results.get("T_coolant", 300) + delta_T + 50  # Approximation
+        
+        # Perte de charge (approximation Darcy-Weisbach)
+        D_h = 4 * ch_width * ch_depth / (2 * (ch_width + ch_depth))  # mm
+        D_h_m = D_h / 1000
+        L_channel = base_results.get("L_cooled", 0.2)  # m
+        rho = base_results.get("coolant_density", 800)  # kg/m³
+        mu = base_results.get("coolant_viscosity", 0.001)  # Pa.s
+        
+        Re = rho * v_coolant * D_h_m / mu
+        f = 0.316 / (Re ** 0.25) if Re > 0 else 0.02  # Blasius
+        dp = f * L_channel / D_h_m * rho * v_coolant**2 / 2 / 1e5  # bar
+        
+        # Masse (proportionnelle à l'épaisseur et au nombre de canaux)
+        A_cooled = base_results.get("A_cooled", 0.05)  # m²
+        volume = A_cooled * wall_t / 1000  # m³
+        density_wall = 8960  # kg/m³ cuivre
+        mass = volume * density_wall  # kg
+        
+        # Marge thermique
+        T_fusion = 1350  # K pour cuivre
+        margin = (T_fusion - T_wall) / T_fusion * 100  # %
+        
+        # Vérifier les contraintes
+        constraints_ok = True
+        penalty = 0
+        
+        if self.optim_constraints["T_wall_max"]["active"].get():
+            T_max = self.optim_constraints["T_wall_max"]["value"].get()
+            if T_wall > T_max:
+                penalty += (T_wall - T_max) * 10
+                constraints_ok = False
+        
+        if self.optim_constraints["dp_max"]["active"].get():
+            dp_max = self.optim_constraints["dp_max"]["value"].get()
+            if dp > dp_max:
+                penalty += (dp - dp_max) * 100
+                constraints_ok = False
+        
+        if self.optim_constraints["margin_min"]["active"].get():
+            margin_min = self.optim_constraints["margin_min"]["value"].get()
+            if margin < margin_min:
+                penalty += (margin_min - margin) * 10
+                constraints_ok = False
+        
+        # Calculer le score selon l'objectif
+        objective = self.optim_objective.get()
+        
+        if objective == "min_mass":
+            score = mass + penalty
+        elif objective == "min_dp":
+            score = dp + penalty
+        elif objective == "max_margin":
+            score = -margin + penalty  # Négatif car on minimise
+        else:  # multi-objectif
+            # Normaliser et pondérer
+            score = 0.4 * mass + 0.3 * dp + 0.3 * (-margin / 100) + penalty
+        
+        metrics = {
+            "T_wall": T_wall,
+            "dp": dp,
+            "margin": margin,
+            "mass": mass,
+            "constraints_ok": constraints_ok
+        }
+        
+        return score, metrics
+
+    def _update_optim_progress(self, progress, score, config, metrics):
+        """Met à jour l'interface avec la progression."""
+        self.optim_progress["value"] = progress
+        self.optim_progress_label.config(text=f"{progress:.0f}%")
+        
+        # Ajouter au tableau
+        rank = len(self.optim_tree.get_children()) + 1
+        values = (
+            rank,
+            f"{config.get('wall_thickness', '-'):.1f}" if 'wall_thickness' in config else "-",
+            f"{config.get('channel_depth', '-'):.1f}" if 'channel_depth' in config else "-",
+            f"{config.get('channel_width', '-'):.1f}" if 'channel_width' in config else "-",
+            f"{config.get('n_channels', '-'):.0f}" if 'n_channels' in config else "-",
+            f"{metrics['T_wall']:.0f} K",
+            f"{metrics['dp']:.2f}",
+            f"{metrics['margin']:.1f}%",
+            f"{metrics['mass']:.2f}",
+            f"{score:.4f}"
+        )
+        self.optim_tree.insert("", "end", values=values)
+        
+        # Mettre à jour le graphique de convergence
+        if len(self.optim_history) > 1:
+            self.ax_optim.clear()
+            self.ax_optim.plot(self.optim_history, color=self.accent, linewidth=1.5)
+            self.ax_optim.set_xlabel("Itération", color=self.text_primary)
+            self.ax_optim.set_ylabel("Score (objectif)", color=self.text_primary)
+            self.ax_optim.set_title("Convergence de l'optimisation", color=self.text_primary)
+            self.ax_optim.tick_params(colors=self.text_primary)
+            self.ax_optim.set_facecolor(self.bg_surface)
+            self.fig_optim.tight_layout()
+            self.canvas_optim.draw()
+
+    def _grid_search(self, active_vars, var_keys, objective_function):
+        """Recherche exhaustive sur une grille."""
+        import itertools
+        
+        # Créer les grilles pour chaque variable
+        grids = []
+        for key in var_keys:
+            vmin = active_vars[key]["min"].get()
+            vmax = active_vars[key]["max"].get()
+            step = active_vars[key]["step"].get()
+            grid = np.arange(vmin, vmax + step/2, step)
+            grids.append(grid)
+        
+        # Produit cartésien
+        for combo in itertools.product(*grids):
+            if self.optim_stop_flag:
+                break
+            objective_function(list(combo))
+
+    def _finalize_optimization(self):
+        """Finalise l'optimisation et affiche les résultats."""
+        self.optim_running = False
+        self.btn_run_optim.configure(state="normal")
+        self.optim_progress["value"] = 100
+        self.optim_progress_label.config(text="Terminé!")
+        
+        if self.optim_results_list:
+            # Trier par score
+            sorted_results = sorted(self.optim_results_list, key=lambda x: x["score"])
+            best = sorted_results[0]
+            
+            messagebox.showinfo("Optimisation Terminée", 
+                f"Meilleure configuration trouvée:\n\n"
+                f"Score: {best['score']:.4f}\n"
+                f"T paroi: {best['metrics']['T_wall']:.0f} K\n"
+                f"Δp: {best['metrics']['dp']:.2f} bar\n"
+                f"Marge: {best['metrics']['margin']:.1f}%\n"
+                f"Masse: {best['metrics']['mass']:.2f} kg\n\n"
+                f"Utilisez 'Appliquer Meilleur' pour utiliser cette config.")
+
+    def stop_optimization(self):
+        """Arrête l'optimisation en cours."""
+        if self.optim_running:
+            self.optim_stop_flag = True
+            messagebox.showinfo("Info", "Arrêt demandé... L'optimisation va s'arrêter après l'itération en cours.")
+
+    def export_optimization_results(self):
+        """Exporte les résultats d'optimisation en CSV."""
+        if not hasattr(self, 'optim_results_list') or not self.optim_results_list:
+            messagebox.showwarning("Attention", "Pas de résultats à exporter!")
+            return
+        
+        f = filedialog.asksaveasfilename(defaultextension=".csv",
+                                          filetypes=[("CSV files", "*.csv")],
+                                          initialfilename="optimization_results.csv")
+        if not f:
+            return
+        
+        try:
+            with open(f, 'w', encoding='utf-8') as file:
+                # En-tête
+                file.write("rank,wall_thickness,channel_depth,channel_width,n_channels,")
+                file.write("T_wall_K,dp_bar,margin_pct,mass_kg,score\n")
+                
+                sorted_results = sorted(self.optim_results_list, key=lambda x: x["score"])
+                for i, r in enumerate(sorted_results, 1):
+                    cfg = r["config"]
+                    m = r["metrics"]
+                    file.write(f"{i},")
+                    file.write(f"{cfg.get('wall_thickness', ''):.2f},")
+                    file.write(f"{cfg.get('channel_depth', ''):.2f},")
+                    file.write(f"{cfg.get('channel_width', ''):.2f},")
+                    file.write(f"{cfg.get('n_channels', ''):.0f},")
+                    file.write(f"{m['T_wall']:.1f},")
+                    file.write(f"{m['dp']:.3f},")
+                    file.write(f"{m['margin']:.2f},")
+                    file.write(f"{m['mass']:.3f},")
+                    file.write(f"{r['score']:.6f}\n")
+            
+            messagebox.showinfo("Succès", f"Résultats exportés:\n{f}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'export:\n{e}")
+
+    def apply_best_config(self):
+        """Applique la meilleure configuration trouvée aux paramètres."""
+        if not hasattr(self, 'optim_results_list') or not self.optim_results_list:
+            messagebox.showwarning("Attention", "Pas de résultats d'optimisation!")
+            return
+        
+        sorted_results = sorted(self.optim_results_list, key=lambda x: x["score"])
+        best = sorted_results[0]
+        cfg = best["config"]
+        
+        # Appliquer aux champs d'entrée correspondants
+        applied = []
+        
+        if "wall_thickness" in cfg and hasattr(self, 'entry_wall_thickness'):
+            self.entry_wall_thickness.delete(0, tk.END)
+            self.entry_wall_thickness.insert(0, f"{cfg['wall_thickness']:.1f}")
+            applied.append(f"Épaisseur: {cfg['wall_thickness']:.1f} mm")
+        
+        if "n_channels" in cfg and hasattr(self, 'cad_n_channels'):
+            self.cad_n_channels.set(int(cfg['n_channels']))
+            applied.append(f"N canaux: {int(cfg['n_channels'])}")
+        
+        if "channel_depth" in cfg and hasattr(self, 'cad_channel_depth'):
+            self.cad_channel_depth.set(cfg['channel_depth'])
+            applied.append(f"Prof. canaux: {cfg['channel_depth']:.1f} mm")
+        
+        if "channel_width" in cfg and hasattr(self, 'cad_channel_width'):
+            self.cad_channel_width.set(cfg['channel_width'])
+            applied.append(f"Larg. canaux: {cfg['channel_width']:.1f} mm")
+        
+        if applied:
+            messagebox.showinfo("Configuration Appliquée", 
+                "Paramètres mis à jour:\n\n" + "\n".join(applied) + 
+                "\n\nRecalculez le moteur pour voir les résultats.")
+        else:
+            messagebox.showinfo("Info", "Aucun paramètre correspondant trouvé dans l'interface.")
+
+    # =====================================================================
+    # ONGLET CONTRAINTES THERMOMÉCANIQUES
+    # =====================================================================
+    def init_stress_tab(self):
+        """Initialise l'onglet Contraintes Thermomécaniques."""
+        # Barre d'accent verte
+        tk.Frame(self.tab_stress, height=4, bg="#27ae60").pack(fill=tk.X)
+        
+        # Frame principale avec scroll
+        main_canvas = tk.Canvas(self.tab_stress, bg=self.bg_main, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.tab_stress, orient="vertical", command=main_canvas.yview)
+        scroll_frame = ttk.Frame(main_canvas)
+        
+        scroll_frame.bind("<Configure>", lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all")))
+        main_canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Titre
+        header = ttk.Frame(scroll_frame)
+        header.pack(fill=tk.X, pady=(5, 10))
+        ttk.Label(header, text="🛡️ Analyse des Contraintes Thermomécaniques", 
+                  font=("Segoe UI", 14, "bold"), foreground="#27ae60").pack(side=tk.LEFT)
+        ttk.Label(header, text="Calcul des contraintes thermiques et mécaniques dans la paroi",
+                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
+        
+        # Section: Paramètres du matériau
+        mat_frame = ttk.LabelFrame(scroll_frame, text="🔩 Propriétés du Matériau", padding=10)
+        mat_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        # Sélection du matériau
+        row_mat = ttk.Frame(mat_frame)
+        row_mat.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(row_mat, text="Matériau:").pack(side=tk.LEFT)
+        self.stress_material = ttk.Combobox(row_mat, values=[
+            "Cuivre C10200 (Cu-OF)",
+            "Cuivre CuCrZr",
+            "Inconel 718",
+            "Inconel 625",
+            "Acier Inox 316L",
+            "Niobium (Nb)",
+            "Molybdène (Mo)",
+            "Tungstène (W)",
+            "Personnalisé"
+        ], state="readonly", width=25)
+        self.stress_material.set("Cuivre CuCrZr")
+        self.stress_material.pack(side=tk.LEFT, padx=10)
+        self.stress_material.bind("<<ComboboxSelected>>", self.update_material_properties)
+        
+        # Tableau des propriétés
+        props_frame = ttk.Frame(mat_frame)
+        props_frame.pack(fill=tk.X, pady=5)
+        
+        self.stress_props = {}
+        properties = [
+            ("E", "Module d'Young E (GPa)", 120),
+            ("nu", "Coefficient Poisson ν", 0.33),
+            ("alpha", "Coef. dilatation α (µm/m/K)", 17.0),
+            ("sigma_y", "Limite élastique σ_y (MPa)", 250),
+            ("sigma_uts", "Résistance ultime σ_uts (MPa)", 350),
+            ("T_fusion", "Température fusion (K)", 1356),
+        ]
+        
+        for row, (key, label, default) in enumerate(properties):
+            self.stress_props[key] = tk.DoubleVar(value=default)
+            ttk.Label(props_frame, text=label, width=30).grid(row=row, column=0, sticky="w", pady=2)
+            entry = ttk.Entry(props_frame, textvariable=self.stress_props[key], width=12)
+            entry.grid(row=row, column=1, padx=5, pady=2)
+        
+        # Section: Conditions de fonctionnement
+        cond_frame = ttk.LabelFrame(scroll_frame, text="⚙️ Conditions de Fonctionnement", padding=10)
+        cond_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        self.stress_conditions = {}
+        conditions = [
+            ("p_chamber", "Pression chambre (bar)", 50),
+            ("p_coolant", "Pression coolant (bar)", 80),
+            ("T_ref", "Température de référence (K)", 293),
+        ]
+        
+        cond_grid = ttk.Frame(cond_frame)
+        cond_grid.pack(fill=tk.X)
+        
+        for col, (key, label, default) in enumerate(conditions):
+            self.stress_conditions[key] = tk.DoubleVar(value=default)
+            ttk.Label(cond_grid, text=label).grid(row=0, column=col*2, sticky="w", padx=5)
+            ttk.Entry(cond_grid, textvariable=self.stress_conditions[key], width=10).grid(row=0, column=col*2+1, padx=5)
+        
+        # Bouton calcul
+        btn_frame = ttk.Frame(scroll_frame)
+        btn_frame.pack(fill=tk.X, pady=10, padx=5)
+        
+        ttk.Button(btn_frame, text="▶ Calculer Contraintes", 
+                   command=self.calculate_stresses, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="📊 Exporter Rapport", 
+                   command=self.export_stress_report).pack(side=tk.LEFT, padx=5)
+        
+        # Section: Résultats des contraintes
+        results_frame = ttk.LabelFrame(scroll_frame, text="📈 Résultats des Contraintes", padding=10)
+        results_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        # Tableau des résultats
+        self.stress_results_labels = {}
+        result_items = [
+            ("sigma_hoop", "Contrainte circonférentielle (hoop) σ_θ", "MPa", 
+             "Due à la pression interne: σ = p·r/t"),
+            ("sigma_axial", "Contrainte axiale σ_x", "MPa", 
+             "Due à la pression et bridage: σ = p·r/(2t)"),
+            ("sigma_radial", "Contrainte radiale σ_r", "MPa", 
+             "Généralement négligeable: ≈ -p/2"),
+            ("sigma_thermal", "Contrainte thermique σ_th", "MPa", 
+             "Due au gradient: σ = E·α·ΔT/(1-ν)"),
+            ("sigma_vm", "Contrainte équivalente Von Mises σ_vm", "MPa", 
+             "Critère de plasticité"),
+            ("safety_factor", "Facteur de sécurité", "", 
+             "SF = σ_y / σ_vm"),
+            ("creep_margin", "Marge fluage", "%", 
+             "Marge avant déformation permanente"),
+        ]
+        
+        for row, (key, label, unit, tooltip) in enumerate(result_items):
+            ttk.Label(results_frame, text=label, width=40).grid(row=row, column=0, sticky="w", pady=2)
+            lbl_val = ttk.Label(results_frame, text="---", foreground=self.accent, width=15)
+            lbl_val.grid(row=row, column=1, padx=5)
+            ttk.Label(results_frame, text=unit, width=5).grid(row=row, column=2)
+            ttk.Label(results_frame, text=f"  ({tooltip})", foreground=self.text_muted).grid(row=row, column=3, sticky="w")
+            self.stress_results_labels[key] = lbl_val
+        
+        # Section: Graphique des contraintes le long de la tuyère
+        graph_frame = ttk.LabelFrame(scroll_frame, text="📉 Distribution des Contraintes", padding=5)
+        graph_frame.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
+        
+        self.fig_stress = plt.Figure(figsize=(10, 5), dpi=100)
+        self.fig_stress.patch.set_facecolor(self.bg_main)
+        
+        self.ax_stress1 = self.fig_stress.add_subplot(121)
+        self.ax_stress2 = self.fig_stress.add_subplot(122)
+        
+        for ax in [self.ax_stress1, self.ax_stress2]:
+            ax.set_facecolor(self.bg_surface)
+            ax.tick_params(colors=self.text_primary)
+            ax.spines['bottom'].set_color(self.text_muted)
+            ax.spines['top'].set_color(self.text_muted)
+            ax.spines['left'].set_color(self.text_muted)
+            ax.spines['right'].set_color(self.text_muted)
+        
+        self.canvas_stress = FigureCanvasTkAgg(self.fig_stress, master=graph_frame)
+        self.canvas_stress.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Messages initiaux
+        self.ax_stress1.text(0.5, 0.5, "Calculez d'abord le moteur\npuis les contraintes",
+                            transform=self.ax_stress1.transAxes, ha='center', va='center',
+                            fontsize=10, color=self.text_muted)
+        self.ax_stress2.text(0.5, 0.5, "Graphique circulaire\nFacteur de sécurité",
+                            transform=self.ax_stress2.transAxes, ha='center', va='center',
+                            fontsize=10, color=self.text_muted)
+        self.canvas_stress.draw()
+        
+        # Section: Tableau position par position
+        detail_frame = ttk.LabelFrame(scroll_frame, text="📋 Détail par Position", padding=5)
+        detail_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        cols = ("x_mm", "T_wall", "sigma_hoop", "sigma_thermal", "sigma_vm", "SF")
+        self.stress_tree = ttk.Treeview(detail_frame, columns=cols, show="headings", height=8)
+        
+        col_names = ["X (mm)", "T Paroi (K)", "σ_hoop (MPa)", "σ_th (MPa)", "σ_VM (MPa)", "SF"]
+        col_widths = [80, 100, 100, 100, 100, 80]
+        
+        for col, name, width in zip(cols, col_names, col_widths):
+            self.stress_tree.heading(col, text=name)
+            self.stress_tree.column(col, width=width, anchor="center")
+        
+        scrollbar_tree = ttk.Scrollbar(detail_frame, orient="vertical", command=self.stress_tree.yview)
+        self.stress_tree.configure(yscrollcommand=scrollbar_tree.set)
+        
+        self.stress_tree.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def update_material_properties(self, event=None):
+        """Met à jour les propriétés selon le matériau sélectionné."""
+        material = self.stress_material.get()
+        
+        # Base de données des matériaux
+        materials_db = {
+            "Cuivre C10200 (Cu-OF)": {"E": 115, "nu": 0.34, "alpha": 17.0, "sigma_y": 220, "sigma_uts": 310, "T_fusion": 1356},
+            "Cuivre CuCrZr": {"E": 120, "nu": 0.33, "alpha": 17.0, "sigma_y": 400, "sigma_uts": 480, "T_fusion": 1350},
+            "Inconel 718": {"E": 200, "nu": 0.29, "alpha": 13.0, "sigma_y": 1100, "sigma_uts": 1350, "T_fusion": 1609},
+            "Inconel 625": {"E": 208, "nu": 0.28, "alpha": 12.8, "sigma_y": 460, "sigma_uts": 830, "T_fusion": 1623},
+            "Acier Inox 316L": {"E": 193, "nu": 0.30, "alpha": 16.0, "sigma_y": 290, "sigma_uts": 580, "T_fusion": 1673},
+            "Niobium (Nb)": {"E": 105, "nu": 0.40, "alpha": 7.3, "sigma_y": 207, "sigma_uts": 275, "T_fusion": 2750},
+            "Molybdène (Mo)": {"E": 329, "nu": 0.31, "alpha": 4.8, "sigma_y": 550, "sigma_uts": 700, "T_fusion": 2896},
+            "Tungstène (W)": {"E": 411, "nu": 0.28, "alpha": 4.5, "sigma_y": 550, "sigma_uts": 980, "T_fusion": 3695},
+        }
+        
+        if material in materials_db:
+            props = materials_db[material]
+            for key, value in props.items():
+                if key in self.stress_props:
+                    self.stress_props[key].set(value)
+
+    def calculate_stresses(self):
+        """Calcule les contraintes thermomécaniques dans la paroi."""
+        if not self.results:
+            messagebox.showwarning("Attention", "Calculez d'abord le moteur!")
+            return
+        
+        # Récupérer les propriétés
+        E = self.stress_props["E"].get() * 1e9  # GPa -> Pa
+        nu = self.stress_props["nu"].get()
+        alpha = self.stress_props["alpha"].get() * 1e-6  # µm/m/K -> 1/K
+        sigma_y = self.stress_props["sigma_y"].get() * 1e6  # MPa -> Pa
+        T_ref = self.stress_conditions["T_ref"].get()
+        
+        # Conditions
+        p_chamber = self.stress_conditions["p_chamber"].get() * 1e5  # bar -> Pa
+        p_coolant = self.stress_conditions["p_coolant"].get() * 1e5  # bar -> Pa
+        
+        # Géométrie
+        wall_t = self.results.get("wall_thickness_mm", 3.0) / 1000  # mm -> m
+        
+        # Nettoyer le tableau
+        for item in self.stress_tree.get_children():
+            self.stress_tree.delete(item)
+        
+        # Calcul pour chaque position
+        X_profile, R_profile = self.geometry_profile if self.geometry_profile else ([], [])
+        
+        if not X_profile:
+            messagebox.showwarning("Attention", "Profil géométrique non disponible!")
+            return
+        
+        stress_data = []
+        max_sigma_vm = 0
+        min_SF = float('inf')
+        idx_critical = 0
+        
+        for i, (x, r_mm) in enumerate(zip(X_profile, R_profile)):
+            r = r_mm / 1000  # mm -> m
+            
+            # Température paroi (interpoler depuis les résultats thermiques)
+            T_wall = self.results.get("T_wall_hot", 600)  # Simplification
+            
+            # Contrainte hoop (circonférentielle) - pression différentielle
+            delta_p = p_coolant - p_chamber  # Pression nette sur la paroi
+            sigma_hoop = delta_p * r / wall_t
+            
+            # Contrainte axiale (longitudinale)
+            sigma_axial = delta_p * r / (2 * wall_t)
+            
+            # Contrainte radiale (environ -p/2 au milieu de la paroi)
+            sigma_radial = -delta_p / 2
+            
+            # Contrainte thermique
+            delta_T = T_wall - T_ref
+            sigma_thermal = E * alpha * delta_T / (1 - nu)
+            
+            # Contraintes totales (superposition)
+            sigma_total_hoop = sigma_hoop + sigma_thermal
+            sigma_total_axial = sigma_axial + sigma_thermal
+            
+            # Von Mises
+            sigma_vm = np.sqrt(
+                sigma_total_hoop**2 + 
+                sigma_total_axial**2 + 
+                sigma_radial**2 -
+                sigma_total_hoop * sigma_total_axial -
+                sigma_total_axial * sigma_radial -
+                sigma_total_hoop * sigma_radial
+            )
+            
+            # Facteur de sécurité
+            SF = sigma_y / sigma_vm if sigma_vm > 0 else float('inf')
+            
+            stress_data.append({
+                "x": x,
+                "T_wall": T_wall,
+                "sigma_hoop": sigma_total_hoop / 1e6,
+                "sigma_thermal": sigma_thermal / 1e6,
+                "sigma_vm": sigma_vm / 1e6,
+                "SF": SF
+            })
+            
+            # Trouver le point critique
+            if sigma_vm > max_sigma_vm:
+                max_sigma_vm = sigma_vm
+                min_SF = SF
+                idx_critical = i
+            
+            # Ajouter au tableau (tous les 5 points pour ne pas surcharger)
+            if i % 5 == 0:
+                self.stress_tree.insert("", "end", values=(
+                    f"{x:.1f}", f"{T_wall:.0f}",
+                    f"{sigma_total_hoop/1e6:.1f}", f"{sigma_thermal/1e6:.1f}",
+                    f"{sigma_vm/1e6:.1f}", f"{SF:.2f}"
+                ))
+        
+        # Mettre à jour les résultats principaux (point critique)
+        critical = stress_data[idx_critical]
+        self.stress_results_labels["sigma_hoop"].config(text=f"{critical['sigma_hoop']:.1f}")
+        self.stress_results_labels["sigma_axial"].config(text=f"{critical['sigma_hoop']/2:.1f}")
+        self.stress_results_labels["sigma_radial"].config(text="~0")
+        self.stress_results_labels["sigma_thermal"].config(text=f"{critical['sigma_thermal']:.1f}")
+        self.stress_results_labels["sigma_vm"].config(text=f"{critical['sigma_vm']:.1f}")
+        
+        # Couleur selon le facteur de sécurité
+        if min_SF > 2.0:
+            sf_color = "#27ae60"  # Vert
+            status = "SÉCURITAIRE"
+        elif min_SF > 1.5:
+            sf_color = "#f39c12"  # Orange
+            status = "ATTENTION"
+        elif min_SF > 1.0:
+            sf_color = "#e67e22"  # Orange foncé
+            status = "CRITIQUE"
+        else:
+            sf_color = "#e74c3c"  # Rouge
+            status = "DANGER"
+        
+        self.stress_results_labels["safety_factor"].config(text=f"{min_SF:.2f} ({status})", foreground=sf_color)
+        
+        # Marge fluage
+        T_fusion = self.stress_props["T_fusion"].get()
+        T_wall_max = max(d["T_wall"] for d in stress_data)
+        creep_margin = (T_fusion - T_wall_max) / T_fusion * 100
+        self.stress_results_labels["creep_margin"].config(text=f"{creep_margin:.1f}")
+        
+        # Mettre à jour les graphiques
+        self._update_stress_plots(stress_data, X_profile, min_SF, sigma_y / 1e6)
+
+    def _update_stress_plots(self, stress_data, X_profile, min_SF, sigma_y_mpa):
+        """Met à jour les graphiques des contraintes."""
+        self.fig_stress.clear()
+        self.ax_stress1 = self.fig_stress.add_subplot(121)
+        self.ax_stress2 = self.fig_stress.add_subplot(122, projection='polar')
+        
+        for ax in [self.ax_stress1]:
+            ax.set_facecolor(self.bg_surface)
+            ax.tick_params(colors=self.text_primary)
+        self.ax_stress2.set_facecolor(self.bg_surface)
+        self.ax_stress2.tick_params(colors=self.text_primary)
+        
+        x_vals = [d["x"] for d in stress_data]
+        
+        # Graphique 1: Distribution des contraintes
+        self.ax_stress1.plot(x_vals, [d["sigma_hoop"] for d in stress_data], 
+                            label="σ_hoop", color=self.accent, linewidth=1.5)
+        self.ax_stress1.plot(x_vals, [d["sigma_thermal"] for d in stress_data], 
+                            label="σ_thermal", color="#e74c3c", linewidth=1.5)
+        self.ax_stress1.plot(x_vals, [d["sigma_vm"] for d in stress_data], 
+                            label="σ_VM", color="#f39c12", linewidth=2)
+        
+        # Ligne limite élastique
+        self.ax_stress1.axhline(y=sigma_y_mpa, color="#e74c3c", linestyle="--", 
+                               linewidth=1.5, label=f"σ_y = {sigma_y_mpa:.0f} MPa")
+        
+        self.ax_stress1.set_xlabel("Position X (mm)", color=self.text_primary)
+        self.ax_stress1.set_ylabel("Contrainte (MPa)", color=self.text_primary)
+        self.ax_stress1.set_title("Distribution des Contraintes", color=self.text_primary)
+        self.ax_stress1.legend(fontsize=8)
+        self.ax_stress1.grid(True, alpha=0.3)
+        
+        # Graphique 2: Facteur de sécurité (jauge circulaire)
+        theta = np.linspace(0, 2 * np.pi, 100)
+        
+        # Zone de sécurité
+        sf_normalized = min(min_SF / 3, 1)  # Normaliser sur échelle 0-3
+        
+        # Arcs colorés
+        self.ax_stress2.fill_between(theta[:int(33)], 0, 1, color='#e74c3c', alpha=0.3, label='Danger (SF<1)')
+        self.ax_stress2.fill_between(theta[33:66], 0, 1, color='#f39c12', alpha=0.3, label='Attention (1-2)')
+        self.ax_stress2.fill_between(theta[66:], 0, 1, color='#27ae60', alpha=0.3, label='Sûr (>2)')
+        
+        # Aiguille du SF actuel
+        sf_angle = min_SF / 3 * 2 * np.pi
+        self.ax_stress2.plot([0, sf_angle], [0, 0.9], color='white', linewidth=3)
+        self.ax_stress2.scatter([sf_angle], [0.9], color='white', s=100, zorder=5)
+        
+        self.ax_stress2.set_title(f"Facteur de Sécurité: {min_SF:.2f}", color=self.text_primary, pad=20)
+        self.ax_stress2.set_ylim(0, 1)
+        
+        self.fig_stress.tight_layout()
+        self.canvas_stress.draw()
+
+    def export_stress_report(self):
+        """Exporte un rapport des contraintes."""
+        messagebox.showinfo("Info", "Fonctionnalité d'export en développement.\n\nLes données sont affichées dans le tableau ci-dessous.")
+
+    # =====================================================================
+    # ONGLET SIMULATION TRANSITOIRE
+    # =====================================================================
+    def init_transient_tab(self):
+        """Initialise l'onglet Simulation Transitoire."""
+        # Barre d'accent bleue
+        tk.Frame(self.tab_transient, height=4, bg="#3498db").pack(fill=tk.X)
+        
+        # Frame principale
+        main_frame = ttk.Frame(self.tab_transient)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Titre
+        header = ttk.Frame(main_frame)
+        header.pack(fill=tk.X, pady=(5, 10))
+        ttk.Label(header, text="⏱️ Simulation Transitoire Thermique", 
+                  font=("Segoe UI", 14, "bold"), foreground="#3498db").pack(side=tk.LEFT)
+        ttk.Label(header, text="Évolution temporelle des températures durant démarrage/arrêt",
+                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
+        
+        # Panneau de contrôle à gauche
+        left_panel = ttk.Frame(main_frame, width=350)
+        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        left_panel.pack_propagate(False)
+        
+        # Section: Paramètres de simulation
+        sim_frame = ttk.LabelFrame(left_panel, text="⚙️ Paramètres Simulation", padding=10)
+        sim_frame.pack(fill=tk.X, pady=5)
+        
+        self.transient_params = {}
+        params = [
+            ("t_total", "Durée totale (s)", 30.0),
+            ("dt", "Pas de temps (s)", 0.1),
+            ("t_startup", "Durée montée (s)", 2.0),
+            ("t_steady", "Durée régime permanent (s)", 20.0),
+            ("t_shutdown", "Durée descente (s)", 3.0),
+        ]
+        
+        for row, (key, label, default) in enumerate(params):
+            self.transient_params[key] = tk.DoubleVar(value=default)
+            ttk.Label(sim_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
+            ttk.Entry(sim_frame, textvariable=self.transient_params[key], width=10).grid(row=row, column=1, padx=5)
+        
+        # Section: Conditions initiales
+        init_frame = ttk.LabelFrame(left_panel, text="🌡️ Conditions Initiales", padding=10)
+        init_frame.pack(fill=tk.X, pady=5)
+        
+        self.transient_init = {}
+        init_params = [
+            ("T_wall_init", "T paroi initiale (K)", 293),
+            ("T_coolant_init", "T coolant initiale (K)", 293),
+            ("mdot_fuel_init", "Débit fuel initial (kg/s)", 0),
+        ]
+        
+        for row, (key, label, default) in enumerate(init_params):
+            self.transient_init[key] = tk.DoubleVar(value=default)
+            ttk.Label(init_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
+            ttk.Entry(init_frame, textvariable=self.transient_init[key], width=10).grid(row=row, column=1, padx=5)
+        
+        # Section: Propriétés thermiques paroi
+        therm_frame = ttk.LabelFrame(left_panel, text="🔥 Propriétés Thermiques", padding=10)
+        therm_frame.pack(fill=tk.X, pady=5)
+        
+        self.transient_therm = {}
+        therm_params = [
+            ("rho_wall", "Masse volumique paroi (kg/m³)", 8960),
+            ("cp_wall", "Capacité calorifique Cp (J/kg.K)", 385),
+            ("k_wall", "Conductivité k (W/m.K)", 380),
+        ]
+        
+        for row, (key, label, default) in enumerate(therm_params):
+            self.transient_therm[key] = tk.DoubleVar(value=default)
+            ttk.Label(therm_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
+            ttk.Entry(therm_frame, textvariable=self.transient_therm[key], width=10).grid(row=row, column=1, padx=5)
+        
+        # Section: Type de transitoire
+        type_frame = ttk.LabelFrame(left_panel, text="📊 Type de Simulation", padding=10)
+        type_frame.pack(fill=tk.X, pady=5)
+        
+        self.transient_type = tk.StringVar(value="startup_shutdown")
+        types = [
+            ("startup_shutdown", "Démarrage + Régime + Arrêt"),
+            ("startup_only", "Démarrage seul"),
+            ("thermal_shock", "Choc thermique"),
+            ("pulse", "Pulse (on-off-on)"),
+        ]
+        
+        for value, text in types:
+            ttk.Radiobutton(type_frame, text=text, variable=self.transient_type, value=value).pack(anchor="w")
+        
+        # Boutons
+        btn_frame = ttk.Frame(left_panel)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(btn_frame, text="▶ Lancer Simulation", 
+                   command=self.run_transient_simulation, style="Accent.TButton").pack(fill=tk.X, pady=2)
+        
+        # Barre de progression
+        self.transient_progress = ttk.Progressbar(left_panel, mode="determinate")
+        self.transient_progress.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(btn_frame, text="💾 Exporter Données", 
+                   command=self.export_transient_data).pack(fill=tk.X, pady=2)
+        
+        # Panneau graphique à droite
+        graph_panel = ttk.LabelFrame(main_frame, text="📈 Évolution Temporelle", padding=5)
+        graph_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        self.fig_transient = plt.Figure(figsize=(10, 8), dpi=100)
+        self.fig_transient.patch.set_facecolor(self.bg_main)
+        
+        # Créer 3 sous-graphiques
+        gs = self.fig_transient.add_gridspec(3, 1, hspace=0.3)
+        self.ax_trans_temp = self.fig_transient.add_subplot(gs[0])
+        self.ax_trans_flux = self.fig_transient.add_subplot(gs[1])
+        self.ax_trans_stress = self.fig_transient.add_subplot(gs[2])
+        
+        for ax in [self.ax_trans_temp, self.ax_trans_flux, self.ax_trans_stress]:
+            ax.set_facecolor(self.bg_surface)
+            ax.tick_params(colors=self.text_primary)
+            ax.spines['bottom'].set_color(self.text_muted)
+            ax.spines['top'].set_color(self.text_muted)
+            ax.spines['left'].set_color(self.text_muted)
+            ax.spines['right'].set_color(self.text_muted)
+        
+        self.canvas_transient = FigureCanvasTkAgg(self.fig_transient, master=graph_panel)
+        self.canvas_transient.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Messages initiaux
+        self.ax_trans_temp.text(0.5, 0.5, "Lancez une simulation pour voir les résultats",
+                               transform=self.ax_trans_temp.transAxes, ha='center', va='center',
+                               fontsize=10, color=self.text_muted)
+        self.ax_trans_temp.set_title("Températures vs Temps", color=self.text_primary)
+        self.ax_trans_flux.set_title("Flux Thermique vs Temps", color=self.text_primary)
+        self.ax_trans_stress.set_title("Contrainte Thermique vs Temps", color=self.text_primary)
+        self.canvas_transient.draw()
+
+    def run_transient_simulation(self):
+        """Lance la simulation transitoire thermique."""
+        if not self.results:
+            messagebox.showwarning("Attention", "Calculez d'abord le moteur!")
+            return
+        
+        # Récupérer les paramètres
+        t_total = self.transient_params["t_total"].get()
+        dt = self.transient_params["dt"].get()
+        t_startup = self.transient_params["t_startup"].get()
+        t_steady = self.transient_params["t_steady"].get()
+        t_shutdown = self.transient_params["t_shutdown"].get()
+        
+        T_wall_init = self.transient_init["T_wall_init"].get()
+        T_coolant = self.results.get("T_coolant", 300)
+        T_gas_steady = self.results.get("T_gas", 3500)
+        
+        rho_wall = self.transient_therm["rho_wall"].get()
+        cp_wall = self.transient_therm["cp_wall"].get()
+        k_wall = self.transient_therm["k_wall"].get()
+        
+        wall_t = self.results.get("wall_thickness_mm", 3.0) / 1000  # m
+        
+        # Paramètres thermiques
+        h_gas = self.results.get("h_gas_avg", 5000)  # W/m²K
+        h_coolant = self.results.get("h_coolant", 20000)  # W/m²K
+        
+        # Temps de simulation
+        n_steps = int(t_total / dt)
+        time_array = np.linspace(0, t_total, n_steps)
+        
+        # Arrays de résultats
+        T_wall_hot = np.zeros(n_steps)
+        T_wall_cold = np.zeros(n_steps)
+        q_flux = np.zeros(n_steps)
+        sigma_th = np.zeros(n_steps)
+        
+        # Conditions initiales
+        T_wall_hot[0] = T_wall_init
+        T_wall_cold[0] = T_wall_init
+        
+        # Propriétés pour la contrainte thermique
+        E = self.stress_props["E"].get() * 1e9 if hasattr(self, 'stress_props') else 120e9
+        nu = self.stress_props["nu"].get() if hasattr(self, 'stress_props') else 0.33
+        alpha = self.stress_props["alpha"].get() * 1e-6 if hasattr(self, 'stress_props') else 17e-6
+        
+        # Masse thermique
+        A_wall = self.results.get("A_cooled", 0.05)  # m²
+        if A_wall is None or A_wall <= 0:
+            A_wall = 0.05  # Valeur par défaut
+        m_wall = rho_wall * A_wall * wall_t  # kg
+        C_th = m_wall * cp_wall  # Capacité thermique (J/K)
+        
+        # Vérification pour éviter division par zéro
+        if C_th <= 0 or not np.isfinite(C_th):
+            messagebox.showerror("Erreur", "Capacité thermique invalide. Vérifiez les paramètres.")
+            return
+        
+        # Simulation transitoire (modèle simple 1D)
+        for i in range(1, n_steps):
+            t = time_array[i]
+            
+            # Profil de température des gaz (fonction du temps)
+            if self.transient_type.get() == "startup_shutdown":
+                if t < t_startup:
+                    # Phase de démarrage (rampe linéaire)
+                    T_gas = T_wall_init + (T_gas_steady - T_wall_init) * (t / t_startup)
+                    mdot_factor = t / t_startup
+                elif t < t_startup + t_steady:
+                    # Régime permanent
+                    T_gas = T_gas_steady
+                    mdot_factor = 1.0
+                else:
+                    # Arrêt
+                    t_after_steady = t - (t_startup + t_steady)
+                    T_gas = T_gas_steady - (T_gas_steady - T_wall_init) * min(1, t_after_steady / t_shutdown)
+                    mdot_factor = max(0, 1 - t_after_steady / t_shutdown)
+            elif self.transient_type.get() == "startup_only":
+                T_gas = T_wall_init + (T_gas_steady - T_wall_init) * min(1, t / t_startup)
+                mdot_factor = min(1, t / t_startup)
+            elif self.transient_type.get() == "thermal_shock":
+                T_gas = T_gas_steady if t > 0.1 else T_wall_init
+                mdot_factor = 1 if t > 0.1 else 0
+            else:  # pulse
+                period = t_total / 3
+                T_gas = T_gas_steady if (t % period) < period / 2 else T_wall_init
+                mdot_factor = 1 if (t % period) < period / 2 else 0
+            
+            # Coefficients de transfert effectifs
+            h_g_eff = h_gas * mdot_factor**0.8 if mdot_factor > 0 else 10  # Convection naturelle min
+            
+            # Bilan thermique sur la paroi (modèle à 2 nœuds)
+            # Flux entrant (gaz -> paroi hot)
+            q_in = h_g_eff * (T_gas - T_wall_hot[i-1])
+            
+            # Conduction à travers la paroi
+            q_cond = k_wall / wall_t * (T_wall_hot[i-1] - T_wall_cold[i-1])
+            
+            # Flux sortant (paroi cold -> coolant)
+            q_out = h_coolant * (T_wall_cold[i-1] - T_coolant)
+            
+            # Évolution des températures (Euler explicite)
+            dT_hot = (q_in - q_cond) * A_wall / (C_th / 2) * dt
+            dT_cold = (q_cond - q_out) * A_wall / (C_th / 2) * dt
+            
+            T_wall_hot[i] = T_wall_hot[i-1] + dT_hot
+            T_wall_cold[i] = T_wall_cold[i-1] + dT_cold
+            
+            # Flux et contrainte
+            q_flux[i] = q_in
+            delta_T = T_wall_hot[i] - T_wall_cold[i]
+            sigma_th[i] = E * alpha * delta_T / (1 - nu) / 1e6  # MPa
+            
+            # Mettre à jour la progression
+            if i % 100 == 0:
+                self.transient_progress["value"] = i / n_steps * 100
+                self.root.update_idletasks()
+        
+        self.transient_progress["value"] = 100
+        
+        # Stocker les résultats
+        self.transient_results = {
+            "time": time_array,
+            "T_wall_hot": T_wall_hot,
+            "T_wall_cold": T_wall_cold,
+            "q_flux": q_flux,
+            "sigma_th": sigma_th
+        }
+        
+        # Mettre à jour les graphiques
+        self._update_transient_plots()
+        
+        messagebox.showinfo("Simulation Terminée", 
+            f"Simulation transitoire terminée!\n\n"
+            f"Durée: {t_total:.1f} s\n"
+            f"T_wall_hot max: {max(T_wall_hot):.0f} K\n"
+            f"Flux max: {max(q_flux)/1e6:.2f} MW/m²\n"
+            f"Contrainte max: {max(sigma_th):.1f} MPa")
+
+    def _update_transient_plots(self):
+        """Met à jour les graphiques transitoires."""
+        if not hasattr(self, 'transient_results'):
+            return
+        
+        res = self.transient_results
+        time = res["time"]
+        
+        # Nettoyer les axes
+        for ax in [self.ax_trans_temp, self.ax_trans_flux, self.ax_trans_stress]:
+            ax.clear()
+            ax.set_facecolor(self.bg_surface)
+            ax.tick_params(colors=self.text_primary)
+        
+        # Graphique 1: Températures
+        self.ax_trans_temp.plot(time, res["T_wall_hot"], label="T paroi (hot)", color="#e74c3c", linewidth=1.5)
+        self.ax_trans_temp.plot(time, res["T_wall_cold"], label="T paroi (cold)", color="#3498db", linewidth=1.5)
+        self.ax_trans_temp.axhline(y=self.results.get("T_coolant", 300), color=self.accent, 
+                                   linestyle="--", label="T coolant", alpha=0.7)
+        self.ax_trans_temp.set_ylabel("Température (K)", color=self.text_primary)
+        self.ax_trans_temp.set_title("Évolution des Températures", color=self.text_primary)
+        self.ax_trans_temp.legend(fontsize=8)
+        self.ax_trans_temp.grid(True, alpha=0.3)
+        
+        # Graphique 2: Flux thermique
+        self.ax_trans_flux.plot(time, res["q_flux"] / 1e6, color="#f39c12", linewidth=1.5)
+        self.ax_trans_flux.set_ylabel("Flux (MW/m²)", color=self.text_primary)
+        self.ax_trans_flux.set_title("Flux Thermique Incident", color=self.text_primary)
+        self.ax_trans_flux.fill_between(time, 0, res["q_flux"] / 1e6, alpha=0.3, color="#f39c12")
+        self.ax_trans_flux.grid(True, alpha=0.3)
+        
+        # Graphique 3: Contrainte thermique
+        self.ax_trans_stress.plot(time, res["sigma_th"], color="#9b59b6", linewidth=1.5)
+        self.ax_trans_stress.set_xlabel("Temps (s)", color=self.text_primary)
+        self.ax_trans_stress.set_ylabel("Contrainte σ_th (MPa)", color=self.text_primary)
+        self.ax_trans_stress.set_title("Contrainte Thermique dans la Paroi", color=self.text_primary)
+        self.ax_trans_stress.grid(True, alpha=0.3)
+        
+        # Limite élastique si disponible
+        if hasattr(self, 'stress_props'):
+            sigma_y = self.stress_props["sigma_y"].get()
+            self.ax_trans_stress.axhline(y=sigma_y, color="#e74c3c", linestyle="--", 
+                                        label=f"σ_y = {sigma_y} MPa", alpha=0.7)
+            self.ax_trans_stress.legend(fontsize=8)
+        
+        self.fig_transient.tight_layout()
+        self.canvas_transient.draw()
+
+    def export_transient_data(self):
+        """Exporte les données de simulation transitoire."""
+        if not hasattr(self, 'transient_results'):
+            messagebox.showwarning("Attention", "Pas de données à exporter!")
+            return
+        
+        f = filedialog.asksaveasfilename(defaultextension=".csv",
+                                          filetypes=[("CSV files", "*.csv")],
+                                          initialfilename="transient_simulation.csv")
+        if not f:
+            return
+        
+        try:
+            res = self.transient_results
+            with open(f, 'w', encoding='utf-8') as file:
+                file.write("time_s,T_wall_hot_K,T_wall_cold_K,q_flux_Wm2,sigma_th_MPa\n")
+                for i in range(len(res["time"])):
+                    file.write(f"{res['time'][i]:.4f},{res['T_wall_hot'][i]:.1f},"
+                              f"{res['T_wall_cold'][i]:.1f},{res['q_flux'][i]:.0f},"
+                              f"{res['sigma_th'][i]:.2f}\n")
+            
+            messagebox.showinfo("Succès", f"Données exportées:\n{f}")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'export:\n{e}")
 
     def init_graphs_tab(self):
         tk.Frame(self.tab_graphs, height=4, bg=self.tab_accent.get("graphs", self.accent)).pack(fill=tk.X)
@@ -3384,6 +5682,9 @@ class RocketApp:
             # Forcer le rafraîchissement complet de la figure
             self.fig_thermal.subplots_adjust(hspace=0.35, left=0.12, right=0.95, top=0.95, bottom=0.1)
             self.canvas_thermal.draw()
+            
+            # Mettre à jour la carte thermique 2D
+            self.update_heatmap()
             
             # Géométrie 2D
             self.draw_engine(X_mm, Y_mm)
