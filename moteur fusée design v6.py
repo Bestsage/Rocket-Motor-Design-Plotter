@@ -1276,7 +1276,7 @@ class RocketApp:
         
         f = filedialog.asksaveasfilename(defaultextension=".stl", 
                                           filetypes=[("STL files", "*.stl")],
-                                          initialfilename=f"{self.get_val('name')}_nozzle.stl")
+                                          initialfile=f"{self.get_val('name')}_nozzle.stl")
         if not f:
             return
         
@@ -1404,7 +1404,7 @@ class RocketApp:
         """Export STEP via CadQuery."""
         f = filedialog.asksaveasfilename(defaultextension=".step", 
                                           filetypes=[("STEP files", "*.step"), ("STEP files", "*.stp")],
-                                          initialfilename=f"{self.get_val('name')}_nozzle.step")
+                                          initialfile=f"{self.get_val('name')}_nozzle.step")
         if not f:
             return
         
@@ -1443,7 +1443,7 @@ class RocketApp:
         
         f = filedialog.asksaveasfilename(defaultextension=".dxf", 
                                           filetypes=[("DXF files", "*.dxf")],
-                                          initialfilename=f"{self.get_val('name')}_profile_CAD.dxf")
+                                          initialfile=f"{self.get_val('name')}_profile_CAD.dxf")
         if not f:
             return
         
@@ -2029,7 +2029,7 @@ class RocketApp:
         
         f = filedialog.asksaveasfilename(defaultextension=".csv",
                                           filetypes=[("CSV files", "*.csv")],
-                                          initialfilename="optimization_results.csv")
+                                          initialfile="optimization_results.csv")
         if not f:
             return
         
@@ -2817,7 +2817,7 @@ class RocketApp:
         
         f = filedialog.asksaveasfilename(defaultextension=".csv",
                                           filetypes=[("CSV files", "*.csv")],
-                                          initialfilename="transient_simulation.csv")
+                                          initialfile="transient_simulation.csv")
         if not f:
             return
         
@@ -6600,3 +6600,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RocketApp(root)
     root.mainloop()
+
