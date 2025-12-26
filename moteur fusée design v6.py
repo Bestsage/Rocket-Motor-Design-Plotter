@@ -766,7 +766,7 @@ class RocketApp:
         if self.heatmap_show_limits.get():
             # Cercle de limite de température
             wall_k = self.get_val("wall_k") if self.get_val("wall_k") else 320
-            t_limit = self.get_val("wall_limit") if self.get_val("wall_limit") else 1000
+            t_limit = self.get_val("twall") if self.get_val("twall") else 1000
             
             # Trouver le rayon où T = T_limit (si applicable)
             if t_hot_local > t_limit:
@@ -885,7 +885,7 @@ class RocketApp:
         
         # Limites du matériau
         if self.heatmap_show_limits.get():
-            t_limit = self.get_val("wall_limit") if self.get_val("wall_limit") else 1000
+            t_limit = self.get_val("twall") if self.get_val("twall") else 1000
             # Contour de la limite
             limit_contour = self.ax_heatmap.contour(X_grid, D_grid, T_grid, levels=[t_limit], 
                                                      colors=['red'], linewidths=2, linestyles='--')
