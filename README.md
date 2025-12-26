@@ -1,5 +1,7 @@
 # SITH MISCHUNG COMBUSTION : Dark Side Edition
 
+> **Authors:** [Bestsage](https://github.com/Bestsage) & [Sabu8c](https://github.com/Sabu8c)
+
 **SITH MISCHUNG COMBUSTION : Dark Side Edition v6.3** - A comprehensive rocket engine design and analysis tool with regenerative cooling simulation
 
 ## Overview
@@ -68,8 +70,10 @@ NASA CEA (Chemical Equilibrium with Applications) is the industry-standard softw
 
 ### Required Dependencies
 
+Install all required dependencies with a single command:
+
 ```bash
-pip install tkinter matplotlib numpy rocketcea
+pip install matplotlib numpy rocketcea
 ```
 
 ### Optional Dependencies
@@ -80,11 +84,22 @@ pip install ezdxf
 ```
 
 ### Dependency Details
-- **tkinter**: GUI framework (usually included with Python)
-- **matplotlib**: Plotting and visualization
-- **numpy**: Numerical computations
-- **rocketcea**: NASA CEA wrapper for propellant calculations - **This is the core dependency that provides access to NASA CEA**
-- **ezdxf**: CAD file export (optional)
+
+| Package | Description | Installation |
+|---------|-------------|-------------|
+| **tkinter** | GUI framework | Included with Python (no install needed) |
+| **matplotlib** | Plotting and visualization | `pip install matplotlib` |
+| **numpy** | Numerical computations | `pip install numpy` |
+| **rocketcea** | NASA CEA wrapper for propellant calculations | `pip install rocketcea` |
+| **ezdxf** | CAD file export (optional) | `pip install ezdxf` |
+
+#### Built-in Python Modules (No Installation Required)
+The following modules are part of Python's standard library and require no installation:
+- `tkinter` - GUI framework
+- `math` - Mathematical functions
+- `json` - JSON file handling
+- `os` - Operating system interface
+- `datetime` - Date and time operations
 
 ### About RocketCEA
 
@@ -99,8 +114,10 @@ RocketCEA is a Python wrapper for NASA's CEA (Chemical Equilibrium with Applicat
 
 ### Starting the Application
 
+Run the main application file:
+
 ```bash
-python "moteur fusée design v6.py"
+python main.py
 ```
 
 ### Basic Workflow
@@ -395,4 +412,4 @@ All thermochemical data and performance calculations are powered by NASA's CEA p
 
 **Version**: PROMETHEUS v6.1 (Regen Cooling)  
 **Last Updated**: 2025  
-**Author**: Bestsage
+**Author**: Bestsage & Sabuc
