@@ -4470,12 +4470,12 @@ class RocketApp:
         
         # Charger le contenu depuis le fichier externe
         import os
-        wiki_file = os.path.join(os.path.dirname(__file__), 'wiki_thermal_content.txt')
+        wiki_file = os.path.join(os.path.dirname(__file__), 'wiki.txt')
         try:
             with open(wiki_file, 'r', encoding='utf-8') as f:
                 content = f.read()
         except FileNotFoundError:
-            content = "Erreur: Fichier wiki_thermal_content.txt non trouvé.\n\nPlacez le fichier wiki_thermal_content.txt dans le même répertoire que ce script."
+            content = "Erreur: Fichier wiki.txt non trouvé.\n\nPlacez le fichier wiki.txt dans le même répertoire que ce script."
         except Exception as e:
             content = f"Erreur lors du chargement du wiki: {str(e)}"
         
