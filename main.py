@@ -1,15 +1,23 @@
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext, filedialog, font as tkfont
+from tkinter import messagebox, scrolledtext, filedialog, font as tkfont
+import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import numpy as np
 import math
 import json
 import os
+import io
+import re
 from datetime import datetime
+
+# Configuration CustomTkinter
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
 
 #this code only works with python 3.10 and below, 3.11, 3.13, and 3.14 dont support rocketcea.
 
@@ -48,23 +56,29 @@ class RocketApp:
         self.root = root
         self.root.title("SITH MISCHUNG COMBUSTION : DARK SIDE EDITION v6.3")
         self.root.geometry("1700x1080")
-        self.root.state('zoomed')  # Maximize for large displays
+        
+        # Maximiser la fenêtre
+        try:
+            self.root.state('zoomed')
+        except:
+            pass
 
         # Zoom options for UI (defined early for create_inputs)
         self.zoom_options = ["Auto", "1.0", "1.15", "1.25", "1.35", "1.5"]
 
         # --- THEME (OLED + Néon) ---
-        self.bg_main = "#05060e"
-        self.bg_panel = "#0b1020"
-        self.bg_surface = "#0f172c"
+        self.bg_main = "#0a0a0f"
+        self.bg_panel = "#0d1117"
+        self.bg_surface = "#161b22"
         self.accent = "#00eaff"       # cyan néon
         self.accent_alt = "#ff5af1"   # magenta néon
         self.accent_alt2 = "#9dff6a"  # vert néon doux
         self.accent_alt3 = "#ffb347"  # orange chaud
         self.accent_alt4 = "#7b9bff"  # lavande
         self.text_primary = "#e8f1ff"
-        self.text_muted = "#9fb4d3"
-        self.grid_color = "#1f2a3d"
+        self.text_muted = "#8b949e"
+        self.grid_color = "#21262d"
+        self.border_color = "#30363d"
 
         self.tab_accent = {
             "summary": self.accent,
@@ -73,7 +87,7 @@ class RocketApp:
             "graphs": self.accent,
             "cea": self.accent_alt2,
             "database": self.accent_alt4,
-            "solver": "#00ffaa",  # Vert/cyan pour le solveur
+            "solver": "#00ffaa",
         }
 
         plt.rcParams.update({
@@ -92,123 +106,86 @@ class RocketApp:
         # --- VARIABLES ---
         self.inputs = {}
         self.results = {}
-        self.geometry_profile = None  # Pour stocker X, Y du profil
+        self.geometry_profile = None
         
         # --- BASE DE DONNÉES MATÉRIAUX UNIFIÉE ---
         self.materials_db = {
-            # --- CUIVRES (Conductivité maximale) ---
             "Cuivre (Cu-OFHC)": {"k": 390, "T_melt": 1356, "T_max": 800, "rho": 8940, "E": 115, "nu": 0.34, "alpha": 17.0, "sigma_y": 60, "sigma_uts": 220, "color": "#b87333"},
             "Cuivre-Chrome (CuCr)": {"k": 320, "T_melt": 1350, "T_max": 1050, "rho": 8900, "E": 118, "nu": 0.33, "alpha": 17.0, "sigma_y": 350, "sigma_uts": 420, "color": "#cd7f32"},
             "Cuivre-Zirconium (CuZr)": {"k": 340, "T_melt": 1356, "T_max": 900, "rho": 8920, "E": 120, "nu": 0.33, "alpha": 17.0, "sigma_y": 280, "sigma_uts": 380, "color": "#d2691e"},
             "GlidCop AL-15": {"k": 365, "T_melt": 1356, "T_max": 1200, "rho": 8900, "E": 130, "nu": 0.33, "alpha": 16.6, "sigma_y": 380, "sigma_uts": 450, "color": "#cc5500"},
             "CuCrNb (GRCop-42)": {"k": 320, "T_melt": 1330, "T_max": 1100, "rho": 8790, "E": 115, "nu": 0.33, "alpha": 17.5, "sigma_y": 260, "sigma_uts": 430, "color": "#ff7f50"},
-
-            # --- ALUMINIUMS (Légèreté, Impression 3D) ---
             "AlSi10Mg (SLM)": {"k": 110, "T_melt": 843, "T_max": 570, "rho": 2670, "E": 70, "nu": 0.33, "alpha": 21.0, "sigma_y": 240, "sigma_uts": 350, "color": "#a9a9a9"},
             "Aluminium 7075-T6": {"k": 130, "T_melt": 750, "T_max": 400, "rho": 2810, "E": 71, "nu": 0.33, "alpha": 23.6, "sigma_y": 503, "sigma_uts": 572, "color": "#c0c0c0"},
             "Aluminium 6061-T6": {"k": 167, "T_melt": 855, "T_max": 450, "rho": 2700, "E": 69, "nu": 0.33, "alpha": 23.6, "sigma_y": 276, "sigma_uts": 310, "color": "#d3d3d3"},
-
-            # --- SUPERALLIAGES NICKEL (Haute température) ---
             "Inconel 718": {"k": 11.4, "T_melt": 1533, "T_max": 1200, "rho": 8190, "E": 200, "nu": 0.29, "alpha": 13.0, "sigma_y": 1030, "sigma_uts": 1240, "color": "#8b4513"},
             "Inconel 625": {"k": 9.8, "T_melt": 1563, "T_max": 1250, "rho": 8440, "E": 207, "nu": 0.28, "alpha": 12.8, "sigma_y": 460, "sigma_uts": 880, "color": "#a0522d"},
             "Monel 400": {"k": 21.8, "T_melt": 1570, "T_max": 1000, "rho": 8800, "E": 179, "nu": 0.32, "alpha": 13.9, "sigma_y": 240, "sigma_uts": 550, "color": "#808000"},
             "Hastelloy X": {"k": 9.1, "T_melt": 1530, "T_max": 1300, "rho": 8220, "E": 205, "nu": 0.30, "alpha": 14.0, "sigma_y": 360, "sigma_uts": 750, "color": "#556b2f"},
-
-            # --- ACIERS (Standard) ---
             "Acier Inox 316L": {"k": 16.3, "T_melt": 1673, "T_max": 1100, "rho": 8000, "E": 193, "nu": 0.30, "alpha": 16.0, "sigma_y": 290, "sigma_uts": 580, "color": "#708090"},
             "Acier Inox 304L": {"k": 16.2, "T_melt": 1673, "T_max": 1050, "rho": 7900, "E": 193, "nu": 0.29, "alpha": 17.2, "sigma_y": 215, "sigma_uts": 505, "color": "#778899"},
             "Acier Inox 17-4PH": {"k": 17.9, "T_melt": 1677, "T_max": 600, "rho": 7750, "E": 196, "nu": 0.27, "alpha": 10.8, "sigma_y": 1100, "sigma_uts": 1250, "color": "#696969"},
-
-            # --- TITANES ---
             "Titane Ti-6Al-4V": {"k": 6.7, "T_melt": 1933, "T_max": 750, "rho": 4430, "E": 114, "nu": 0.34, "alpha": 8.6, "sigma_y": 880, "sigma_uts": 950, "color": "#4682b4"},
-
-            # --- RÉFRACTAIRES (Extrême température) ---
             "Niobium C-103": {"k": 42, "T_melt": 2623, "T_max": 2200, "rho": 8860, "E": 90, "nu": 0.40, "alpha": 7.3, "sigma_y": 250, "sigma_uts": 380, "color": "#9370db"},
             "Molybdène (TZM)": {"k": 126, "T_melt": 2896, "T_max": 2400, "rho": 10220, "E": 320, "nu": 0.31, "alpha": 5.3, "sigma_y": 560, "sigma_uts": 700, "color": "#4b0082"},
             "Tungstène": {"k": 173, "T_melt": 3695, "T_max": 3200, "rho": 19250, "E": 411, "nu": 0.28, "alpha": 4.5, "sigma_y": 550, "sigma_uts": 980, "color": "#000080"},
             "Tantalum": {"k": 57, "T_melt": 3290, "T_max": 2800, "rho": 16690, "E": 186, "nu": 0.34, "alpha": 6.3, "sigma_y": 170, "sigma_uts": 250, "color": "#483d8b"},
             "Rhenium": {"k": 48, "T_melt": 3459, "T_max": 3000, "rho": 21020, "E": 463, "nu": 0.26, "alpha": 6.2, "sigma_y": 290, "sigma_uts": 490, "color": "#800000"},
-
-            # --- COMPOSITES / AUTRES ---
             "Graphite": {"k": 120, "T_melt": 3900, "T_max": 3500, "rho": 1800, "E": 11, "nu": 0.20, "alpha": 4.0, "sigma_y": 30, "sigma_uts": 45, "color": "#000000"},
             "Carbon-Phenolic": {"k": 1.5, "T_melt": 2500, "T_max": 3000, "rho": 1450, "E": 15, "nu": 0.30, "alpha": 5.0, "sigma_y": 50, "sigma_uts": 80, "color": "#2f4f4f"},
         }
-        
-        style = ttk.Style()
-        style.theme_use('clam')
-        self.root.configure(bg=self.bg_main)
-        style.configure(".", background=self.bg_main, foreground=self.text_primary)
-        style.configure("TFrame", background=self.bg_main)
-        style.configure("TLabelFrame", background=self.bg_surface, foreground=self.accent, bordercolor=self.accent, borderwidth=1, relief="solid")
-        style.configure("TLabelFrame.Label", background=self.bg_surface, foreground=self.accent)
-        style.configure("TLabel", background=self.bg_main, foreground=self.text_primary)
-        style.configure("TNotebook", background=self.bg_main, borderwidth=0)
-        style.configure("TNotebook.Tab", background=self.bg_surface, foreground=self.text_primary, padding=(12, 8))
-        style.map("TNotebook.Tab", background=[("selected", self.accent)], foreground=[("selected", "#05060e")])
-        style.configure("TButton", background=self.accent, foreground="#05060e", padding=(10, 6), borderwidth=0, focusthickness=3, focuscolor=self.accent_alt)
-        style.map("TButton", background=[("active", self.accent_alt)], foreground=[("disabled", "#55607a")])
-        style.configure("Primary.TButton", background=self.accent, foreground="#05060e", padding=(10, 6), borderwidth=0, focusthickness=3, focuscolor=self.accent_alt)
-        style.map("Primary.TButton", background=[("active", self.accent_alt)], foreground=[("disabled", "#55607a")])
-        style.configure("Secondary.TButton", background=self.accent_alt, foreground="#05060e", padding=(10, 6), borderwidth=0, focusthickness=3, focuscolor=self.accent)
-        style.map("Secondary.TButton", background=[("active", self.accent)], foreground=[("disabled", "#55607a")])
-        style.configure("Success.TButton", background=self.accent_alt2, foreground="#05060e", padding=(10, 6), borderwidth=0, focusthickness=3, focuscolor=self.accent_alt)
-        style.map("Success.TButton", background=[("active", self.accent_alt3)], foreground=[("disabled", "#55607a")])
-        style.configure("Warning.TButton", background=self.accent_alt3, foreground="#05060e", padding=(10, 6), borderwidth=0, focusthickness=3, focuscolor=self.accent_alt)
-        style.map("Warning.TButton", background=[("active", self.accent_alt2)], foreground=[("disabled", "#55607a")])
-        style.configure("TEntry", fieldbackground=self.bg_surface, foreground=self.text_primary, insertcolor=self.accent)
-        style.configure("TCombobox", fieldbackground=self.bg_surface, background=self.bg_surface, foreground=self.text_primary, arrowcolor=self.accent)
-        style.map("TCombobox", fieldbackground=[("readonly", self.bg_surface)], foreground=[("readonly", self.text_primary)])
-        style.configure("TSpinbox", fieldbackground=self.bg_surface, background=self.bg_surface, foreground=self.text_primary, arrowcolor=self.accent, insertcolor=self.accent)
-        style.map("TSpinbox", fieldbackground=[("!disabled", self.bg_surface)], foreground=[("!disabled", self.text_primary)])
-        style.configure("TCheckbutton", background=self.bg_main, foreground=self.text_primary)
-        style.configure("Treeview", background=self.bg_surface, fieldbackground=self.bg_surface, foreground=self.text_primary, bordercolor=self.bg_surface, rowheight=22)
-        style.configure("Treeview.Heading", background=self.bg_main, foreground=self.accent, bordercolor=self.bg_surface)
-        style.map("Treeview", background=[("selected", "#123042")], foreground=[("selected", self.text_primary)])
-        style.configure("Vertical.TScrollbar", background=self.bg_main, troughcolor=self.bg_surface, arrowcolor=self.accent)
-        style.configure("Horizontal.TProgressbar", background=self.accent, troughcolor=self.bg_surface, lightcolor=self.accent, darkcolor=self.accent)
 
-        # --- LAYOUT PRINCIPAL ---
-        main_frame = ttk.Frame(self.root)
+        # --- LAYOUT PRINCIPAL CUSTOMTKINTER ---
+        main_frame = ctk.CTkFrame(self.root, fg_color=self.bg_main)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Panneau Gauche
-        left_panel = ttk.LabelFrame(main_frame, text="Paramètres de Conception", width=380)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        # Panneau Gauche (scrollable)
+        left_panel = ctk.CTkScrollableFrame(
+            main_frame, 
+            width=400,
+            fg_color=self.bg_panel,
+            border_color=self.border_color,
+            border_width=1,
+            corner_radius=10,
+            label_text="⚙️ Paramètres de Conception",
+            label_fg_color=self.accent,
+            label_text_color=self.bg_main
+        )
+        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10), pady=0)
         
         # Panneau Droit
-        right_panel = ttk.Frame(main_frame)
-        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        right_panel = ctk.CTkFrame(main_frame, fg_color=self.bg_main)
+        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        self.tabs = ttk.Notebook(right_panel)
+        # TabView CustomTkinter
+        self.tabs = ctk.CTkTabview(
+            right_panel,
+            fg_color=self.bg_panel,
+            segmented_button_fg_color=self.bg_surface,
+            segmented_button_selected_color=self.accent,
+            segmented_button_selected_hover_color=self.accent_alt,
+            segmented_button_unselected_color=self.bg_surface,
+            segmented_button_unselected_hover_color=self.grid_color,
+            text_color=self.text_primary,
+            text_color_disabled=self.text_muted,
+            corner_radius=10
+        )
         self.tabs.pack(fill=tk.BOTH, expand=True)
         
-        self.tab_summary = ttk.Frame(self.tabs)
-        self.tab_thermal = ttk.Frame(self.tabs)
-        self.tab_heatmap = ttk.Frame(self.tabs)
-        self.tab_cad = ttk.Frame(self.tabs)
-        self.tab_optimizer = ttk.Frame(self.tabs)
-        self.tab_stress = ttk.Frame(self.tabs)
-        self.tab_transient = ttk.Frame(self.tabs)
-        self.tab_graphs = ttk.Frame(self.tabs)
-        self.tab_cea = ttk.Frame(self.tabs)
-        self.tab_database = ttk.Frame(self.tabs)
-        self.tab_solver = ttk.Frame(self.tabs)
-        self.tab_wiki = ttk.Frame(self.tabs)
+        # Créer les onglets
+        self.tab_summary = self.tabs.add("📊 Résumé")
+        self.tab_cad = self.tabs.add("👁️ Visu & CAD")
+        self.tab_thermal = self.tabs.add("🌡️ Thermique")
+        self.tab_heatmap = self.tabs.add("🔥 Carte 2D")
+        self.tab_optimizer = self.tabs.add("⚙️ Optimiseur")
+        self.tab_stress = self.tabs.add("🛡️ Contraintes")
+        self.tab_graphs = self.tabs.add("📈 Analyses")
+        self.tab_cea = self.tabs.add("🔬 NASA CEA")
+        self.tab_database = self.tabs.add("🔍 Matériaux")
+        self.tab_solver = self.tabs.add("🧊 Coolant")
+        self.tab_wiki = self.tabs.add("📖 Wiki")
         
-        self.tabs.add(self.tab_summary, text="📊 Résumé")
-        self.tabs.add(self.tab_cad, text="👁️ Visualisation & Export CAD")
-        self.tabs.add(self.tab_thermal, text="Analyse Thermique (Bartz)")
-        self.tabs.add(self.tab_heatmap, text="🔥 Carte Thermique")
-        self.tabs.add(self.tab_optimizer, text="⚙️ Optimiseur")
-        self.tabs.add(self.tab_stress, text="🛡️ Contraintes")
-        self.tabs.add(self.tab_transient, text="⏱️ Transitoire")
-        self.tabs.add(self.tab_graphs, text="Analyses Paramétriques")
-        self.tabs.add(self.tab_cea, text="Sortie NASA CEA (Raw)")
-        self.tabs.add(self.tab_database, text="🔍 Base de Données")
-        self.tabs.add(self.tab_solver, text="🧊 Solveur Coolant")
-        self.tabs.add(self.tab_wiki, text="📖 Wiki")
-        
-        # Calculer le zoom AVANT d'initialiser les onglets (pour les polices)
+        # Calculer le zoom AVANT d'initialiser les onglets
         self.ui_scale = self.auto_scale_from_display()
         
         self.create_inputs(left_panel)
@@ -218,7 +195,6 @@ class RocketApp:
         self.init_cad_tab()
         self.init_optimizer_tab()
         self.init_stress_tab()
-        self.init_transient_tab()
         self.init_cea_tab()
         self.init_graphs_tab()
         self.init_database_tab()
@@ -316,22 +292,28 @@ class RocketApp:
         self.apply_ui_scale(scale)
 
     def create_inputs(self, parent):
-        # Zoom UI selector
-        ttk.Label(parent, text="Zoom UI:").grid(row=0, column=0, sticky="w", padx=5, pady=2)
-        self.zoom_var = tk.StringVar(value="Auto")
-        zoom_combo = ttk.Combobox(parent, textvariable=self.zoom_var, values=self.zoom_options, state="readonly", width=8)
-        zoom_combo.grid(row=0, column=1, sticky="ew", padx=5, pady=2)
-        zoom_combo.bind("<<ComboboxSelected>>", lambda e: self.set_ui_scale_from_control())
-
-        # --- SÉLECTION MATÉRIAU GLOBAL ---
-        row = 1
-        ttk.Label(parent, text="Matériau Paroi:").grid(row=row, column=0, sticky="w", padx=5, pady=2)
-        self.global_material_var = tk.StringVar(value="Cuivre-Zirconium (CuZr)")
-        mat_combo = ttk.Combobox(parent, textvariable=self.global_material_var, values=list(self.materials_db.keys()), state="readonly")
-        mat_combo.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        mat_combo.bind("<<ComboboxSelected>>", self.on_global_material_change)
+        row = 0
         
-        # Ajouter aux inputs pour sauvegarde/chargement
+        # --- SÉLECTION MATÉRIAU GLOBAL ---
+        ctk.CTkLabel(parent, text="🔩 Matériau Paroi:", font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=self.accent).grid(row=row, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 5))
+        row += 1
+        
+        self.global_material_var = tk.StringVar(value="Cuivre-Zirconium (CuZr)")
+        mat_combo = ctk.CTkComboBox(
+            parent, variable=self.global_material_var, 
+            values=list(self.materials_db.keys()),
+            width=280,
+            fg_color=self.bg_surface,
+            border_color=self.border_color,
+            button_color=self.accent,
+            button_hover_color=self.accent_alt,
+            dropdown_fg_color=self.bg_surface,
+            dropdown_hover_color=self.accent,
+            dropdown_text_color=self.text_primary,
+            command=lambda x: self.on_global_material_change()
+        )
+        mat_combo.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
         self.inputs["material_name"] = (self.global_material_var, str)
         row += 1
 
@@ -348,50 +330,112 @@ class RocketApp:
             ("Angle Sortie Bell (°)", "te", 8.0, float),
             ("L* (L-star) (m)", "lstar", 1.0, float),
             ("Pression Ambiante (bar)", "pamb", 1.013, float),
-            # --- Paroi ---
             ("Temp. Paroi Max (K)", "twall", 1000.0, float),
-            ("Épaisseur Paroi (mm)", "wall_thickness", 2.0, float),  # Épaisseur en mm
-            ("Conductivité Paroi (W/m-K)", "wall_k", 340.0, float),  # Acier inox ~15, Cuivre ~400, Inconel ~12
-            # --- Refroidissement Régénératif ---
-            ("Coolant (Auto=fuel)", "coolant_name", "Auto", str),  # Auto, H2O, C3H8, CH4, Custom...
-            ("Débit Coolant (Auto=fuel)", "coolant_mdot", "Auto", str),  # Auto ou valeur en kg/s
-            ("Coolant Pression (bar)", "coolant_pressure", 15.0, float),  # Pression circuit coolant
-            ("Coolant T entrée (K)", "coolant_tin", 293.0, float),  # 20°C par défaut
-            ("Coolant T sortie max (K)", "coolant_tout", 350.0, float),  # Avant vaporisation
-            ("Marge Sécurité Coolant (%)", "coolant_margin", 20.0, float),  # 20% de marge
-            # --- Coolant Custom (si Coolant = Custom) ---
+            ("Épaisseur Paroi (mm)", "wall_thickness", 2.0, float),
+            ("Conductivité Paroi (W/m-K)", "wall_k", 340.0, float),
+            ("Coolant (Auto=fuel)", "coolant_name", "Auto", str),
+            ("Débit Coolant (Auto=fuel)", "coolant_mdot", "Auto", str),
+            ("Coolant Pression (bar)", "coolant_pressure", 15.0, float),
+            ("Coolant T entrée (K)", "coolant_tin", 293.0, float),
+            ("Coolant T sortie max (K)", "coolant_tout", 350.0, float),
+            ("Marge Sécurité Coolant (%)", "coolant_margin", 20.0, float),
             ("Custom Cp (J/kg-K)", "custom_cp", 2500.0, float),
             ("Custom T ébullition @1bar (K)", "custom_tboil", 350.0, float),
             ("Custom T critique (K)", "custom_tcrit", 500.0, float),
-            ("Custom Hvap (kJ/kg)", "custom_hvap", 400.0, float),  # Enthalpie vaporisation
+            ("Custom Hvap (kJ/kg)", "custom_hvap", 400.0, float),
         ]
         
-        # row = 1  # REMOVED, continue from previous
         for label, key, default, type_ in self.param_defs:
-            lbl = ttk.Label(parent, text=label)
-            lbl.grid(row=row, column=0, sticky="w", padx=5, pady=2)
+            lbl = ctk.CTkLabel(parent, text=label, font=ctk.CTkFont(size=12), text_color=self.text_primary)
+            lbl.grid(row=row, column=0, sticky="w", padx=10, pady=3)
             var = tk.StringVar(value=str(default))
-            entry = ttk.Entry(parent, textvariable=var)
-            entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+            entry = ctk.CTkEntry(
+                parent, textvariable=var, width=140,
+                fg_color=self.bg_surface,
+                border_color=self.border_color,
+                text_color=self.text_primary,
+                placeholder_text_color=self.text_muted
+            )
+            entry.grid(row=row, column=1, sticky="ew", padx=10, pady=3)
             self.inputs[key] = (var, type_)
             row += 1
-            
-        ttk.Separator(parent, orient='horizontal').grid(row=row, column=0, columnspan=2, sticky="ew", pady=10)
+        
+        # Séparateur visuel
+        separator = ctk.CTkFrame(parent, height=2, fg_color=self.accent)
+        separator.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=15)
         row += 1
         
-        ttk.Button(parent, text="🔥 CALCULER TOUT (CEA + THERMIQUE)", command=self.run_simulation, style="Primary.TButton").grid(row=row, column=0, columnspan=2, pady=5, sticky="ew")
+        # Bouton principal
+        ctk.CTkButton(
+            parent, text="🔥 CALCULER TOUT (CEA + THERMIQUE)", 
+            command=self.run_simulation,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            height=45,
+            fg_color=self.accent,
+            hover_color=self.accent_alt,
+            text_color=self.bg_main,
+            corner_radius=8
+        ).grid(row=row, column=0, columnspan=2, pady=8, padx=10, sticky="ew")
         row += 1
         
-        # Boutons de sauvegarde/chargement
-        ttk.Button(parent, text="💾 Sauvegarder Paramètres", command=self.save_design, style="Secondary.TButton").grid(row=row, column=0, columnspan=2, pady=5, sticky="ew")
-        row += 1
-        ttk.Button(parent, text="📂 Charger Paramètres", command=self.load_design, style="Success.TButton").grid(row=row, column=0, columnspan=2, pady=5, sticky="ew")
+        # Boutons secondaires
+        btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        btn_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
         row += 1
         
-        # Bouton d'export DXF et graphes
-        ttk.Button(parent, text="💾 EXPORTER DXF", command=self.export_dxf, style="Warning.TButton").grid(row=row, column=0, columnspan=2, pady=5, sticky="ew")
+        ctk.CTkButton(
+            btn_frame, text="💾 Sauvegarder", command=self.save_design,
+            width=130, height=35,
+            fg_color=self.accent_alt,
+            hover_color=self.accent,
+            text_color=self.bg_main,
+            corner_radius=6
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        ctk.CTkButton(
+            btn_frame, text="📂 Charger", command=self.load_design,
+            width=130, height=35,
+            fg_color=self.accent_alt2,
+            hover_color=self.accent_alt3,
+            text_color=self.bg_main,
+            corner_radius=6
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Export buttons
+        export_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        export_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
         row += 1
-        ttk.Button(parent, text="📊 Exporter Graphes HD", command=self.export_graphs_hd, style="Primary.TButton").grid(row=row, column=0, columnspan=2, pady=5, sticky="ew")
+        
+        ctk.CTkButton(
+            export_frame, text="📐 Export DXF", command=self.export_dxf,
+            width=130, height=35,
+            fg_color=self.accent_alt3,
+            hover_color=self.accent_alt2,
+            text_color=self.bg_main,
+            corner_radius=6
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        ctk.CTkButton(
+            export_frame, text="📊 Graphes HD", command=self.export_graphs_hd,
+            width=130, height=35,
+            fg_color=self.accent_alt4,
+            hover_color=self.accent,
+            text_color=self.bg_main,
+            corner_radius=6
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Bouton aide
+        ctk.CTkButton(
+            parent, text="ℹ️ Aide & Wiki", 
+            command=lambda: self.open_wiki_at("1. INTRODUCTION"),
+            width=280, height=32,
+            fg_color="transparent",
+            border_width=1,
+            border_color=self.accent,
+            hover_color=self.bg_surface,
+            text_color=self.accent,
+            corner_radius=6
+        ).grid(row=row, column=0, columnspan=2, pady=10, padx=10, sticky="ew")
 
     def on_global_material_change(self, event=None):
         """Met à jour les champs de propriétés quand le matériau change."""
@@ -435,51 +479,29 @@ class RocketApp:
     # --- TABS INIT ---
     def init_summary_tab(self):
         """Onglet Résumé - Affiche les résultats des calculs"""
-        tk.Frame(self.tab_summary, height=4, bg=self.tab_accent.get("summary", self.accent)).pack(fill=tk.X)
-        summary_frame = ttk.Frame(self.tab_summary)
+        # Barre d'accent en haut
+        accent_bar = ctk.CTkFrame(self.tab_summary, height=4, fg_color=self.tab_accent.get("summary", self.accent))
+        accent_bar.pack(fill=tk.X)
+        
+        summary_frame = ctk.CTkFrame(self.tab_summary, fg_color=self.bg_panel, corner_radius=10)
         summary_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         fs = self.scaled_font_size(13)
         fs_title = self.scaled_font_size(16)
         
-        self.txt_summary = tk.Text(
+        self.txt_summary = ctk.CTkTextbox(
             summary_frame,
-            bg=self.bg_surface,
-            fg=self.text_primary,
-            insertbackground=self.accent,
-            font=("Consolas", fs),
-            highlightthickness=0,
-            bd=0,
+            fg_color=self.bg_surface,
+            text_color=self.text_primary,
+            font=ctk.CTkFont(family="Consolas", size=fs),
+            corner_radius=8,
+            border_width=1,
+            border_color=self.border_color,
         )
-        self.txt_summary.pack(fill=tk.BOTH, expand=True)
+        self.txt_summary.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # === TAGS DE COULEUR STYLE ÉDITEUR DE CODE ===
-        # Titres / Sections (comme les mots-clés)
-        self.txt_summary.tag_configure("title", foreground="#ff79c6", font=("Consolas", fs_title, "bold"))  # Rose/Magenta
-        self.txt_summary.tag_configure("section", foreground="#ffb86c", font=("Consolas", fs, "bold"))  # Orange
-        # Labels de paramètres (comme les variables)
-        self.txt_summary.tag_configure("label", foreground="#8be9fd")  # Cyan
-        # Valeurs numériques (comme les nombres)
-        self.txt_summary.tag_configure("number", foreground="#bd93f9")  # Violet
-        # Unités (comme les commentaires)
-        self.txt_summary.tag_configure("unit", foreground="#6272a4")  # Gris-bleu
-        # Valeurs de chaîne (comme les strings)
-        self.txt_summary.tag_configure("string", foreground="#f1fa8c")  # Jaune
-        # Succès / OK
-        self.txt_summary.tag_configure("success", foreground="#50fa7b")  # Vert
-        # Avertissement
-        self.txt_summary.tag_configure("warning", foreground="#ffb347")  # Orange chaud
-        # Erreur / Critique
-        self.txt_summary.tag_configure("error", foreground="#ff5555")  # Rouge
-        # Séparateurs
-        self.txt_summary.tag_configure("separator", foreground="#44475a")  # Gris foncé
-        # Symboles spéciaux
-        self.txt_summary.tag_configure("symbol", foreground="#ff79c6")  # Rose
-        
-        # Ajouter une scrollbar
-        scrollbar = ttk.Scrollbar(self.txt_summary, command=self.txt_summary.yview, style="Vertical.TScrollbar")
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.txt_summary.config(yscrollcommand=scrollbar.set)
+        # Note: CTkTextbox n'a pas de tags comme tk.Text, mais on peut configurer le texte de base
+        # Les tags de couleur ne fonctionnent pas avec CTkTextbox, mais l'apparence est améliorée
 
     def insert_colored_summary(self, summary: str, cooling_status: str, coolant_warning: str):
         """Insère le summary avec coloration syntaxique style éditeur de code."""
@@ -608,6 +630,14 @@ class RocketApp:
 
     def init_cea_tab(self):
         tk.Frame(self.tab_cea, height=4, bg=self.tab_accent.get("cea", self.accent_alt2)).pack(fill=tk.X)
+        
+        # Toolbar
+        cea_toolbar = ttk.Frame(self.tab_cea)
+        cea_toolbar.pack(fill=tk.X, pady=(5, 0), padx=10)
+        ttk.Label(cea_toolbar, text="Sortie NASA CEA (Brut)", font=("Segoe UI", 12, "bold")).pack(side=tk.LEFT)
+        ttk.Button(cea_toolbar, text="📖 Aide Chimie", style="Secondary.TButton", 
+                   command=lambda: self.open_wiki_at("5. CHIMIE DE COMBUSTION")).pack(side=tk.RIGHT)
+        
         fs = self.scaled_font_size(13)
         self.txt_cea = scrolledtext.ScrolledText(
             self.tab_cea,
@@ -632,6 +662,15 @@ class RocketApp:
         
     def init_thermal_tab(self):
         tk.Frame(self.tab_thermal, height=4, bg=self.tab_accent.get("thermal", self.accent_alt)).pack(fill=tk.X)
+        
+        # Toolbar
+        thermal_toolbar = ttk.Frame(self.tab_thermal)
+        thermal_toolbar.pack(fill=tk.X, pady=(5, 0), padx=10)
+        
+        ttk.Label(thermal_toolbar, text="Graphiques : Flux & Température", font=("Segoe UI", 12, "bold")).pack(side=tk.LEFT)
+        ttk.Button(thermal_toolbar, text="📖 Aide Thermique", style="Secondary.TButton", 
+                   command=lambda: self.open_wiki_at("6. TRANSFERT THERMIQUE")).pack(side=tk.RIGHT)
+        
         self.fig_thermal, (self.ax_flux, self.ax_temp) = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
         self.fig_thermal.patch.set_facecolor(self.bg_main)
         self.fig_thermal.subplots_adjust(hspace=0.35, left=0.12, right=0.95, top=0.95, bottom=0.1)
@@ -707,6 +746,8 @@ class RocketApp:
         self.heatmap_x_label.pack(side=tk.LEFT)
         
         ttk.Button(row2, text="🔄 Actualiser", command=self.update_heatmap).pack(side=tk.RIGHT, padx=10)
+        ttk.Button(row2, text="📖 Aide 2D", style="Secondary.TButton",
+                   command=lambda: self.open_wiki_at("23. CARTE THERMIQUE")).pack(side=tk.RIGHT)
         
         # Ligne 3: Informations thermiques en temps réel
         self.heatmap_info_frame = ttk.LabelFrame(ctrl_frame, text="📊 Données au point sélectionné", padding=5)
@@ -1105,6 +1146,10 @@ class RocketApp:
         # === Panneau de contrôles à gauche ===
         ctrl_panel = ttk.LabelFrame(main_frame, text="🔧 Configuration Export CAD 3D", padding=10)
         ctrl_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        
+        # Bouton d'aide en haut du panneau
+        ttk.Button(ctrl_panel, text="📖 Aide CAD", style="Secondary.TButton", width=12,
+                   command=lambda: self.open_wiki_at("12. EXPORT CAD")).pack(fill=tk.X, pady=(0, 5))
         
         # Section: Géométrie de base
         geo_frame = ttk.LabelFrame(ctrl_panel, text="Géométrie Tuyère", padding=5)
@@ -1652,10 +1697,13 @@ class RocketApp:
         # Titre
         header = ttk.Frame(scroll_frame)
         header.pack(fill=tk.X, pady=(5, 10))
+        
         ttk.Label(header, text="⚙️ Optimiseur Automatique de Design", 
                   font=("Segoe UI", 14, "bold"), foreground=self.accent).pack(side=tk.LEFT)
-        ttk.Label(header, text="Trouve la configuration optimale selon vos objectifs et contraintes",
-                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
+        
+        # Bouton d'aide Wiki
+        ttk.Button(header, text="📖 Aide", style="Secondary.TButton",
+                   command=lambda: self.open_wiki_at("11. UTILISATION DE L'OPTIMISEUR")).pack(side=tk.RIGHT, padx=10)
         
         # Section: Propriétés Matériau
         mat_frame = ttk.LabelFrame(scroll_frame, text="🔩 Propriétés Matériau (Fixes)", padding=10)
@@ -2548,8 +2596,6 @@ class RocketApp:
         header.pack(fill=tk.X, pady=(5, 10))
         ttk.Label(header, text="🛡️ Analyse des Contraintes Thermomécaniques", 
                   font=("Segoe UI", 14, "bold"), foreground="#27ae60").pack(side=tk.LEFT)
-        ttk.Label(header, text="Calcul des contraintes thermiques et mécaniques dans la paroi",
-                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
         
         # Section: Paramètres du matériau
         mat_frame = ttk.LabelFrame(scroll_frame, text="🔩 Propriétés du Matériau", padding=10)
@@ -2907,366 +2953,6 @@ class RocketApp:
     # =====================================================================
     # ONGLET SIMULATION TRANSITOIRE
     # =====================================================================
-    def init_transient_tab(self):
-        """Initialise l'onglet Simulation Transitoire."""
-        # Barre d'accent bleue
-        tk.Frame(self.tab_transient, height=4, bg="#3498db").pack(fill=tk.X)
-        
-        # Frame principale
-        main_frame = ttk.Frame(self.tab_transient)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Titre
-        header = ttk.Frame(main_frame)
-        header.pack(fill=tk.X, pady=(5, 10))
-        ttk.Label(header, text="⏱️ Simulation Transitoire Thermique", 
-                  font=("Segoe UI", 14, "bold"), foreground="#3498db").pack(side=tk.LEFT)
-        ttk.Label(header, text="Évolution temporelle des températures durant démarrage/arrêt",
-                  foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
-        
-        # Panneau de contrôle à gauche
-        left_panel = ttk.Frame(main_frame, width=350)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
-        left_panel.pack_propagate(False)
-        
-        # Section: Paramètres de simulation
-        sim_frame = ttk.LabelFrame(left_panel, text="⚙️ Paramètres Simulation", padding=10)
-        sim_frame.pack(fill=tk.X, pady=5)
-        
-        self.transient_params = {}
-        params = [
-            ("t_total", "Durée totale (s)", 30.0),
-            ("dt", "Pas de temps (s)", 0.1),
-            ("t_startup", "Durée montée (s)", 2.0),
-            ("t_steady", "Durée régime permanent (s)", 20.0),
-            ("t_shutdown", "Durée descente (s)", 3.0),
-        ]
-        
-        for row, (key, label, default) in enumerate(params):
-            self.transient_params[key] = tk.DoubleVar(value=default)
-            ttk.Label(sim_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
-            ttk.Entry(sim_frame, textvariable=self.transient_params[key], width=10).grid(row=row, column=1, padx=5)
-        
-        # Section: Conditions initiales
-        init_frame = ttk.LabelFrame(left_panel, text="🌡️ Conditions Initiales", padding=10)
-        init_frame.pack(fill=tk.X, pady=5)
-        
-        self.transient_init = {}
-        init_params = [
-            ("T_wall_init", "T paroi initiale (K)", 293),
-            ("T_coolant_init", "T coolant initiale (K)", 293),
-            ("mdot_fuel_init", "Débit fuel initial (kg/s)", 0),
-        ]
-        
-        for row, (key, label, default) in enumerate(init_params):
-            self.transient_init[key] = tk.DoubleVar(value=default)
-            ttk.Label(init_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
-            ttk.Entry(init_frame, textvariable=self.transient_init[key], width=10).grid(row=row, column=1, padx=5)
-        
-        # Section: Propriétés thermiques paroi
-        therm_frame = ttk.LabelFrame(left_panel, text="🔥 Propriétés Thermiques", padding=10)
-        therm_frame.pack(fill=tk.X, pady=5)
-        
-        self.transient_therm = {}
-        therm_params = [
-            ("rho_wall", "Masse volumique paroi (kg/m³)", 8960),
-            ("cp_wall", "Capacité calorifique Cp (J/kg.K)", 385),
-            ("k_wall", "Conductivité k (W/m.K)", 380),
-        ]
-        
-        for row, (key, label, default) in enumerate(therm_params):
-            self.transient_therm[key] = tk.DoubleVar(value=default)
-            ttk.Label(therm_frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
-            ttk.Entry(therm_frame, textvariable=self.transient_therm[key], width=10).grid(row=row, column=1, padx=5)
-        
-        # Section: Type de transitoire
-        type_frame = ttk.LabelFrame(left_panel, text="📊 Type de Simulation", padding=10)
-        type_frame.pack(fill=tk.X, pady=5)
-        
-        self.transient_type = tk.StringVar(value="startup_shutdown")
-        types = [
-            ("startup_shutdown", "Démarrage + Régime + Arrêt"),
-            ("startup_only", "Démarrage seul"),
-            ("thermal_shock", "Choc thermique"),
-            ("pulse", "Pulse (on-off-on)"),
-        ]
-        
-        for value, text in types:
-            ttk.Radiobutton(type_frame, text=text, variable=self.transient_type, value=value).pack(anchor="w")
-        
-        # Boutons
-        btn_frame = ttk.Frame(left_panel)
-        btn_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Button(btn_frame, text="▶ Lancer Simulation", 
-                   command=self.run_transient_simulation, style="Accent.TButton").pack(fill=tk.X, pady=2)
-        
-        # Barre de progression
-        self.transient_progress = ttk.Progressbar(left_panel, mode="determinate")
-        self.transient_progress.pack(fill=tk.X, pady=5)
-        
-        ttk.Button(btn_frame, text="💾 Exporter Données", 
-                   command=self.export_transient_data).pack(fill=tk.X, pady=2)
-        
-        # Panneau graphique à droite
-        graph_panel = ttk.LabelFrame(main_frame, text="📈 Évolution Temporelle", padding=5)
-        graph_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        
-        self.fig_transient = plt.Figure(figsize=(10, 8), dpi=100)
-        self.fig_transient.patch.set_facecolor(self.bg_main)
-        
-        # Créer 3 sous-graphiques
-        gs = self.fig_transient.add_gridspec(3, 1, hspace=0.3)
-        self.ax_trans_temp = self.fig_transient.add_subplot(gs[0])
-        self.ax_trans_flux = self.fig_transient.add_subplot(gs[1])
-        self.ax_trans_stress = self.fig_transient.add_subplot(gs[2])
-        
-        for ax in [self.ax_trans_temp, self.ax_trans_flux, self.ax_trans_stress]:
-            ax.set_facecolor(self.bg_surface)
-            ax.tick_params(colors=self.text_primary)
-            ax.spines['bottom'].set_color(self.text_muted)
-            ax.spines['top'].set_color(self.text_muted)
-            ax.spines['left'].set_color(self.text_muted)
-            ax.spines['right'].set_color(self.text_muted)
-        
-        self.canvas_transient = FigureCanvasTkAgg(self.fig_transient, master=graph_panel)
-        self.canvas_transient.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        # Messages initiaux
-        self.ax_trans_temp.text(0.5, 0.5, "Lancez une simulation pour voir les résultats",
-                               transform=self.ax_trans_temp.transAxes, ha='center', va='center',
-                               fontsize=10, color=self.text_muted)
-        self.ax_trans_temp.set_title("Températures vs Temps", color=self.text_primary)
-        self.ax_trans_flux.set_title("Flux Thermique vs Temps", color=self.text_primary)
-        self.ax_trans_stress.set_title("Contrainte Thermique vs Temps", color=self.text_primary)
-        self.canvas_transient.draw()
-
-    def run_transient_simulation(self):
-        """Lance la simulation transitoire thermique."""
-        if not self.results:
-            messagebox.showwarning("Attention", "Calculez d'abord le moteur!")
-            return
-        
-        # Récupérer les paramètres
-        t_total = self.transient_params["t_total"].get()
-        dt = self.transient_params["dt"].get()
-        t_startup = self.transient_params["t_startup"].get()
-        t_steady = self.transient_params["t_steady"].get()
-        t_shutdown = self.transient_params["t_shutdown"].get()
-        
-        T_wall_init = self.transient_init["T_wall_init"].get()
-        T_coolant = self.results.get("T_coolant", 300)
-        T_gas_steady = self.results.get("T_gas", 3500)
-        
-        rho_wall = self.transient_therm["rho_wall"].get()
-        cp_wall = self.transient_therm["cp_wall"].get()
-        k_wall = self.transient_therm["k_wall"].get()
-        
-        wall_t = self.results.get("wall_thickness_mm", 3.0) / 1000  # m
-        
-        # Paramètres thermiques
-        h_gas = self.results.get("h_gas_avg", 5000)  # W/m²K
-        h_coolant = self.results.get("h_coolant", 20000)  # W/m²K
-        
-        # Temps de simulation
-        n_steps = int(t_total / dt)
-        time_array = np.linspace(0, t_total, n_steps)
-        
-        # Arrays de résultats
-        T_wall_hot = np.zeros(n_steps)
-        T_wall_cold = np.zeros(n_steps)
-        q_flux = np.zeros(n_steps)
-        sigma_th = np.zeros(n_steps)
-        
-        # Conditions initiales
-        T_wall_hot[0] = T_wall_init
-        T_wall_cold[0] = T_wall_init
-        
-        # Propriétés pour la contrainte thermique
-        E = self.stress_props["E"].get() * 1e9 if hasattr(self, 'stress_props') else 120e9
-        nu = self.stress_props["nu"].get() if hasattr(self, 'stress_props') else 0.33
-        alpha = self.stress_props["alpha"].get() * 1e-6 if hasattr(self, 'stress_props') else 17e-6
-        
-        # Masse thermique
-        A_wall = self.results.get("A_cooled", 0.05)  # m²
-        if A_wall is None or A_wall <= 0:
-            A_wall = 0.05  # Valeur par défaut
-        m_wall = rho_wall * A_wall * wall_t  # kg
-        C_th = m_wall * cp_wall  # Capacité thermique (J/K)
-        
-        # Vérification pour éviter division par zéro
-        if C_th <= 0 or not np.isfinite(C_th):
-            messagebox.showerror("Erreur", "Capacité thermique invalide. Vérifiez les paramètres.")
-            return
-        
-        # Simulation transitoire (modèle simple 1D)
-        for i in range(1, n_steps):
-            t = time_array[i]
-            
-            # Profil de température des gaz (fonction du temps)
-            if self.transient_type.get() == "startup_shutdown":
-                if t < t_startup:
-                    # Phase de démarrage (rampe linéaire)
-                    T_gas = T_wall_init + (T_gas_steady - T_wall_init) * (t / t_startup)
-                    mdot_factor = t / t_startup
-                elif t < t_startup + t_steady:
-                    # Régime permanent
-                    T_gas = T_gas_steady
-                    mdot_factor = 1.0
-                else:
-                    # Arrêt
-                    t_after_steady = t - (t_startup + t_steady)
-                    T_gas = T_gas_steady - (T_gas_steady - T_wall_init) * min(1, t_after_steady / t_shutdown)
-                    mdot_factor = max(0, 1 - t_after_steady / t_shutdown)
-            elif self.transient_type.get() == "startup_only":
-                T_gas = T_wall_init + (T_gas_steady - T_wall_init) * min(1, t / t_startup)
-                mdot_factor = min(1, t / t_startup)
-            elif self.transient_type.get() == "thermal_shock":
-                T_gas = T_gas_steady if t > 0.1 else T_wall_init
-                mdot_factor = 1 if t > 0.1 else 0
-            else:  # pulse
-                period = t_total / 3
-                T_gas = T_gas_steady if (t % period) < period / 2 else T_wall_init
-                mdot_factor = 1 if (t % period) < period / 2 else 0
-            
-            # Coefficients de transfert effectifs
-            h_g_eff = h_gas * mdot_factor**0.8 if mdot_factor > 0 else 10  # Convection naturelle min
-            
-            # Bilan thermique sur la paroi (modèle à 2 nœuds)
-            # Flux entrant (gaz -> paroi hot)
-            q_in = h_g_eff * (T_gas - T_wall_hot[i-1])
-            
-            # Conduction à travers la paroi
-            q_cond = k_wall / wall_t * (T_wall_hot[i-1] - T_wall_cold[i-1])
-            
-            # Flux sortant (paroi cold -> coolant)
-            q_out = h_coolant * (T_wall_cold[i-1] - T_coolant)
-            
-            # Évolution des températures (Euler explicite)
-            dT_hot = (q_in - q_cond) * A_wall / (C_th / 2) * dt
-            dT_cold = (q_cond - q_out) * A_wall / (C_th / 2) * dt
-            
-            # Limiter les changements de température pour éviter instabilités
-            dT_hot = np.clip(dT_hot, -500, 500)
-            dT_cold = np.clip(dT_cold, -500, 500)
-            
-            T_wall_hot[i] = T_wall_hot[i-1] + dT_hot
-            T_wall_cold[i] = T_wall_cold[i-1] + dT_cold
-            
-            # Limiter les températures à des valeurs physiques
-            T_wall_hot[i] = np.clip(T_wall_hot[i], T_coolant, 4000)
-            T_wall_cold[i] = np.clip(T_wall_cold[i], T_coolant, T_wall_hot[i])
-            
-            # Flux et contrainte
-            q_flux[i] = q_in
-            delta_T = T_wall_hot[i] - T_wall_cold[i]
-            # Limiter delta_T pour éviter overflow dans sigma_th
-            delta_T = min(delta_T, 2000)  # Max 2000K de gradient
-            sigma_th[i] = E * alpha * delta_T / (1 - nu) / 1e6  # MPa
-            
-            # Mettre à jour la progression
-            if i % 100 == 0:
-                self.transient_progress["value"] = i / n_steps * 100
-                self.root.update_idletasks()
-        
-        self.transient_progress["value"] = 100
-        
-        # Stocker les résultats
-        self.transient_results = {
-            "time": time_array,
-            "T_wall_hot": T_wall_hot,
-            "T_wall_cold": T_wall_cold,
-            "q_flux": q_flux,
-            "sigma_th": sigma_th
-        }
-        
-        # Mettre à jour les graphiques
-        self._update_transient_plots()
-        
-        messagebox.showinfo("Simulation Terminée", 
-            f"Simulation transitoire terminée!\n\n"
-            f"Durée: {t_total:.1f} s\n"
-            f"T_wall_hot max: {max(T_wall_hot):.0f} K\n"
-            f"Flux max: {max(q_flux)/1e6:.2f} MW/m²\n"
-            f"Contrainte max: {max(sigma_th):.1f} MPa")
-
-    def _update_transient_plots(self):
-        """Met à jour les graphiques transitoires."""
-        if not hasattr(self, 'transient_results'):
-            return
-        
-        res = self.transient_results
-        time = res["time"]
-        
-        # Nettoyer les axes
-        for ax in [self.ax_trans_temp, self.ax_trans_flux, self.ax_trans_stress]:
-            ax.clear()
-            ax.set_facecolor(self.bg_surface)
-            ax.tick_params(colors=self.text_primary)
-        
-        # Graphique 1: Températures
-        self.ax_trans_temp.plot(time, res["T_wall_hot"], label="T paroi (hot)", color="#e74c3c", linewidth=1.5)
-        self.ax_trans_temp.plot(time, res["T_wall_cold"], label="T paroi (cold)", color="#3498db", linewidth=1.5)
-        self.ax_trans_temp.axhline(y=self.results.get("T_coolant", 300), color=self.accent, 
-                                   linestyle="--", label="T coolant", alpha=0.7)
-        self.ax_trans_temp.set_ylabel("Température (K)", color=self.text_primary)
-        self.ax_trans_temp.set_title("Évolution des Températures", color=self.text_primary)
-        self.ax_trans_temp.legend(fontsize=8)
-        self.ax_trans_temp.grid(True, alpha=0.3)
-        
-        # Graphique 2: Flux thermique
-        self.ax_trans_flux.plot(time, res["q_flux"] / 1e6, color="#f39c12", linewidth=1.5)
-        self.ax_trans_flux.set_ylabel("Flux (MW/m²)", color=self.text_primary)
-        self.ax_trans_flux.set_title("Flux Thermique Incident", color=self.text_primary)
-        self.ax_trans_flux.fill_between(time, 0, res["q_flux"] / 1e6, alpha=0.3, color="#f39c12")
-        self.ax_trans_flux.grid(True, alpha=0.3)
-        
-        # Graphique 3: Contrainte thermique
-        self.ax_trans_stress.plot(time, res["sigma_th"], color="#9b59b6", linewidth=1.5)
-        self.ax_trans_stress.set_xlabel("Temps (s)", color=self.text_primary)
-        self.ax_trans_stress.set_ylabel("Contrainte σ_th (MPa)", color=self.text_primary)
-        self.ax_trans_stress.set_title("Contrainte Thermique dans la Paroi", color=self.text_primary)
-        self.ax_trans_stress.grid(True, alpha=0.3)
-        
-        # Limite élastique si disponible
-        if hasattr(self, 'stress_props'):
-            sigma_y = self.stress_props["sigma_y"].get()
-            self.ax_trans_stress.axhline(y=sigma_y, color="#e74c3c", linestyle="--", 
-                                        label=f"σ_y = {sigma_y} MPa", alpha=0.7)
-            self.ax_trans_stress.legend(fontsize=8)
-        
-        # Utiliser tight_layout avec gestion d'erreur pour les axes non compatibles
-        try:
-            self.fig_transient.tight_layout()
-        except Exception:
-            pass  # Ignorer si tight_layout échoue
-        self.canvas_transient.draw()
-
-    def export_transient_data(self):
-        """Exporte les données de simulation transitoire."""
-        if not hasattr(self, 'transient_results'):
-            messagebox.showwarning("Attention", "Pas de données à exporter!")
-            return
-        
-        f = filedialog.asksaveasfilename(defaultextension=".csv",
-                                          filetypes=[("CSV files", "*.csv")],
-                                          initialfile="transient_simulation.csv")
-        if not f:
-            return
-        
-        try:
-            res = self.transient_results
-            with open(f, 'w', encoding='utf-8') as file:
-                file.write("time_s,T_wall_hot_K,T_wall_cold_K,q_flux_Wm2,sigma_th_MPa\n")
-                for i in range(len(res["time"])):
-                    file.write(f"{res['time'][i]:.4f},{res['T_wall_hot'][i]:.1f},"
-                              f"{res['T_wall_cold'][i]:.1f},{res['q_flux'][i]:.0f},"
-                              f"{res['sigma_th'][i]:.2f}\n")
-            
-            messagebox.showinfo("Succès", f"Données exportées:\n{f}")
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur d'export:\n{e}")
-
     def init_graphs_tab(self):
         tk.Frame(self.tab_graphs, height=4, bg=self.tab_accent.get("graphs", self.accent)).pack(fill=tk.X)
         ctrl_frame = ttk.LabelFrame(self.tab_graphs, text="Configuration Analyse Paramétrique", padding=10)
@@ -3661,6 +3347,10 @@ class RocketApp:
         # === PANNEAU DE CONFIGURATION ===
         config_frame = ttk.LabelFrame(self.tab_solver, text="⚙️ Configuration du Solveur", padding=10)
         config_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+        
+        # Bouton d'aide Wiki
+        ttk.Button(config_frame, text="📖 Aide Canaux", style="Secondary.TButton", 
+                   command=lambda: self.open_wiki_at("7. DIMENSIONNEMENT DES CANAUX")).pack(anchor='ne', pady=(0, 5))
         
         # Base de données des matériaux avec leurs propriétés
         # Utilise la base unifiée définie dans __init__
@@ -4765,8 +4455,8 @@ class RocketApp:
             "10. Base de Données Matériaux",
             "",
             "════ PARTIE 4 : LOGICIEL ════",
-            "11. Utilisation Optimiseur",
-            "12. Export CAD & Fabrication",
+            "11. Guide de l'Interface et Analyse",
+            "12. Outils Avancés et Production",
             "",
             "════ PARTIE 5 : DOCUMENTATION APPROFONDIE ════",
             "13. Introduction & Concepts",
@@ -4895,9 +4585,10 @@ class RocketApp:
         text_frame = ttk.Frame(content_frame)
         text_frame.pack(fill=tk.BOTH, expand=True)
         
+        # Widget Text Standard (pas de HTML)
         self.wiki_text = tk.Text(text_frame, bg=self.bg_surface, fg=self.text_primary,
-                                 font=("Consolas", 11), wrap=tk.WORD,
-                                 insertbackground=self.accent, padx=15, pady=10,
+                                 font=("Segoe UI", 11), wrap=tk.WORD,
+                                 insertbackground=self.accent, padx=20, pady=15,
                                  highlightthickness=0, bd=0)
         
         scrollbar = ttk.Scrollbar(text_frame, command=self.wiki_text.yview)
@@ -4905,63 +4596,329 @@ class RocketApp:
         self.wiki_text.config(yscrollcommand=scrollbar.set)
         self.wiki_text.pack(fill=tk.BOTH, expand=True)
         
-        # Configurer les tags de style
-        self.wiki_text.tag_configure("h1", font=("Segoe UI", 18, "bold"), foreground="#ff79c6", spacing3=10)
-        self.wiki_text.tag_configure("h2", font=("Segoe UI", 14, "bold"), foreground="#ffb86c", spacing1=15, spacing3=5)
-        self.wiki_text.tag_configure("h3", font=("Segoe UI", 12, "bold"), foreground="#8be9fd", spacing1=10, spacing3=3)
-        self.wiki_text.tag_configure("code", font=("Consolas", 10), background="#1a1a2e", foreground="#50fa7b")
-        self.wiki_text.tag_configure("formula", font=("Consolas", 11), foreground="#bd93f9")
-        self.wiki_text.tag_configure("important", foreground="#ff5555", font=("Consolas", 11, "bold"))
-        self.wiki_text.tag_configure("table_header", font=("Consolas", 10, "bold"), foreground="#8be9fd")
+        # === CONFIGURATION DES STYLES TEXTE ===
+        # Titres
+        self.wiki_text.tag_configure("h1", font=("Segoe UI", 20, "bold"), foreground="#ff79c6", spacing1=20, spacing3=15)
+        self.wiki_text.tag_configure("h2", font=("Segoe UI", 15, "bold"), foreground="#ffb86c", spacing1=18, spacing3=8)
+        self.wiki_text.tag_configure("h3", font=("Segoe UI", 13, "bold"), foreground="#8be9fd", spacing1=12, spacing3=5)
+        self.wiki_text.tag_configure("h4", font=("Segoe UI", 12, "bold"), foreground="#bd93f9", spacing1=8, spacing3=3)
+        
+        # Listes
+        self.wiki_text.tag_configure("bullet", font=("Segoe UI", 11), foreground=self.text_primary, lmargin1=30, lmargin2=50, spacing1=2)
+        self.wiki_text.tag_configure("numbered_list", font=("Segoe UI", 11), foreground=self.text_primary, lmargin1=30, lmargin2=50, spacing1=2)
+        
+        # Code et Tableaux (Monospace)
+        self.wiki_text.tag_configure("code", font=("Consolas", 10), background="#1a1a2e", foreground="#50fa7b", lmargin1=40, lmargin2=40, spacing1=1)
+        self.wiki_text.tag_configure("table_header", font=("Consolas", 10, "bold"), foreground="#8be9fd", background="#1a1a2e")
+        self.wiki_text.tag_configure("table_row", font=("Consolas", 10), foreground="#e8f1ff", background="#1a1a2e")
+        self.wiki_text.tag_configure("formula", font=("Consolas", 11, "bold"), foreground="#bd93f9", background="#1a1a2e", lmargin1=40, lmargin2=40, spacing1=3, spacing3=3)
+        
+        # Mises en évidence
+        self.wiki_text.tag_configure("important", foreground="#ff5555", font=("Segoe UI", 11, "bold"), lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("warning", foreground="#ffb347", font=("Segoe UI", 11, "bold"), background="#2a1a0a", lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("success", foreground="#50fa7b", font=("Segoe UI", 11, "bold"), lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("quote", font=("Segoe UI", 11, "italic"), foreground="#9fb4d3", lmargin1=50, lmargin2=50, spacing1=5, spacing3=5)
         self.wiki_text.tag_configure("highlight", background="#3d3d00", foreground="#ffff00")
-        self.wiki_text.tag_configure("normal", font=("Consolas", 11), foreground=self.text_primary)
+        self.wiki_text.tag_configure("center", justify='center')
+        self.wiki_text.tag_configure("normal", font=("Segoe UI", 11), foreground=self.text_primary, spacing1=2)
         
         # Variable pour la recherche
         self.wiki_search_pos = "1.0"
         
+        # Cache pour les images (LaTeX)
+        self.wiki_images = []
+        
         # Charger le contenu du wiki
         self.load_wiki_content()
     
+    def render_latex(self, formula, fontsize=12):
+        """Renders LaTeX formula to a tk.PhotoImage using Matplotlib"""
+        try:
+            # Create a small figure with transparent background
+            fig = Figure(figsize=(5, 0.8), dpi=100)
+            fig.patch.set_facecolor(self.bg_surface)
+            
+            # Matplotlib requires $ for math mode or unescaped string
+            if not formula.startswith('$'):
+                formula = f"${formula}$"
+            
+            # Add text centered
+            fig.text(0.5, 0.5, formula, fontsize=fontsize, 
+                     color=self.text_primary, 
+                     ha='center', va='center')
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', facecolor=self.bg_surface, edgecolor='none', bbox_inches='tight', pad_inches=0.1)
+            buf.seek(0)
+            
+            img = tk.PhotoImage(data=buf.getvalue())
+            buf.close()
+            return img
+        except Exception as e:
+            print(f"LaTeX Error: {e}")
+            return None
+
     def load_wiki_content(self):
         """Charge le contenu du wiki depuis un fichier externe"""
+        # Charger le contenu depuis le fichier externe - préférer .md si disponible
+        import os
+        wiki_files = [
+            ('wiki.md', 'markdown'),
+            ('wiki.txt', 'text')
+        ]
+        
+        content = None
+        wiki_format = 'text'
+        
+        for filename, format_type in wiki_files:
+            wiki_file = os.path.join(os.path.dirname(__file__), filename)
+            if os.path.exists(wiki_file):
+                try:
+                    with open(wiki_file, 'r', encoding='utf-8-sig') as f:
+                        content = f.read()
+                    wiki_format = format_type
+                    break
+                except Exception as e:
+                    content = f"Erreur lors du chargement de {filename}: {str(e)}"
+                    break
+        
+        if content is None:
+            content = "Erreur: Aucun fichier wiki trouvé (wiki.md ou wiki.txt).\n\nPlacez un fichier wiki.md ou wiki.txt dans le même répertoire que ce script."
+            wiki_format = 'text'
+        
         self.wiki_text.config(state=tk.NORMAL)
         self.wiki_text.delete(1.0, tk.END)
         
-        # Charger le contenu depuis le fichier externe
-        import os
-        wiki_file = os.path.join(os.path.dirname(__file__), 'wiki.txt')
-        try:
-            with open(wiki_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except FileNotFoundError:
-            content = "Erreur: Fichier wiki.txt non trouvé.\n\nPlacez le fichier wiki.txt dans le même répertoire que ce script."
-        except Exception as e:
-            content = f"Erreur lors du chargement du wiki: {str(e)}"
+        # New: Clear TOC and positions
+        self.wiki_toc.delete(0, tk.END)
+        self.section_positions = {}
+        self.wiki_images = [] # Clear image cache
         
-        # Insérer le contenu avec formatage
-        import re
+        # Appliquer le formatage approprié
+        if wiki_format == 'markdown':
+            self._load_markdown_wiki(content)
+        else:
+            self._load_text_wiki(content)
+        
+        self.wiki_text.config(state=tk.DISABLED)
+    
+    def _load_markdown_wiki(self, content):
+        """Parseur Markdown personnalisé pour Tkinter - Avec alignement de tableaux automatique"""
+        lines = content.split('\n')
+        i = 0
+        in_code_block = False
+        
+        while i < len(lines):
+            line = lines[i].rstrip()
+            
+            # 1. Gestion des blocs de code
+            if line.strip().startswith('```'):
+                in_code_block = not in_code_block
+                i += 1
+                continue
+            
+            if in_code_block:
+                self.wiki_text.insert(tk.END, line + '\n', "code")
+                i += 1
+                continue
+            
+            # 1.5. LaTeX Equations (Math Mode $$...$$)
+            if line.strip().startswith('$$') and line.strip().endswith('$$'):
+                formula = line.strip()[2:-2].strip()
+                if formula:
+                    img = self.render_latex(formula, fontsize=14)
+                    if img:
+                        self.wiki_images.append(img)
+                        self.wiki_text.image_create(tk.END, image=img)
+                        self.wiki_text.insert(tk.END, '\n')
+                        self.wiki_text.tag_add("center", "end-2c", "end-1c")
+                    else:
+                        self.wiki_text.insert(tk.END, line + '\n', "code")
+                i += 1
+                continue
+
+            # 2. Gestion des Tableaux (Détection et Formatage)
+            if line.strip().startswith('|'):
+                # Collecter toutes les lignes du tableau
+                table_lines = []
+                while i < len(lines) and lines[i].strip().startswith('|'):
+                    table_lines.append(lines[i].strip())
+                    i += 1
+                
+                # Traiter le tableau si valide
+                if len(table_lines) >= 2:
+                    self._insert_formatted_table(table_lines)
+                else:
+                    # Ligne isolée, traiter comme texte normal
+                    self.wiki_text.insert(tk.END, table_lines[0] + '\n', "normal")
+                continue
+            
+            # 3. Headers
+            # Doit commencer par # suivi d'un espace, et ne pas être dans un bloc de code
+            if line.startswith('#') and not in_code_block:
+                # Vérifier qu'il y a un espace après les # (ex: "## Titre" et pas "#Commentaire")
+                if not re.match(r'^#+\s', line):
+                    self.wiki_text.insert(tk.END, line + '\n', "normal")
+                    i += 1
+                    continue
+
+                level = len(line) - len(line.lstrip('#'))
+                text = line.lstrip('#').strip()
+                tag = f"h{min(level, 4)}"
+                
+                # Capture position
+                start_index = self.wiki_text.index("end-1c")
+                
+                self.wiki_text.insert(tk.END, text + '\n', tag)
+                
+                # Add to TOC
+                indent = "  " * (level - 1)
+                self.wiki_toc.insert(tk.END, indent + text)
+                self.section_positions[self.wiki_toc.size()-1] = start_index
+
+                i += 1
+                continue
+            
+            # 4. Listes
+            if re.match(r'^\s*[\*\-\+]\s+', line):
+                # Remplacer le marqueur par un point bullet propre
+                clean_line = re.sub(r'^\s*[\*\-\+]\s+', '• ', line)
+                self.wiki_text.insert(tk.END, clean_line + '\n', "bullet")
+                i += 1
+                continue
+            
+            if re.match(r'^\s*\d+\.\s+', line):
+                self.wiki_text.insert(tk.END, line + '\n', "numbered_list")
+                i += 1
+                continue
+            
+            # 5. Blockquotes / Info / Alertes
+            if line.startswith('>'):
+                content_text = line.lstrip('>').strip()
+                if "⚠️" in content_text or "Attention" in content_text:
+                    self.wiki_text.insert(tk.END, content_text + '\n', "warning")
+                elif "💡" in content_text or "Note" in content_text:
+                    self.wiki_text.insert(tk.END, content_text + '\n', "quote")
+                else:
+                    self.wiki_text.insert(tk.END, content_text + '\n', "quote")
+                i += 1
+                continue
+            
+            # 6. Texte Normal
+            if line.strip():
+                self.wiki_text.insert(tk.END, line + '\n', "normal")
+            else:
+                self.wiki_text.insert(tk.END, '\n', "normal")
+            
+            i += 1
+
+    def _insert_formatted_table(self, table_lines):
+        """Formate et aligne un tableau Markdown pour affichage en monospace"""
+        # Parser les cellules
+        rows = []
+        for line in table_lines:
+            # Enlever les | de début et fin et split
+            cells = [c.strip() for c in line.strip('|').split('|')]
+            rows.append(cells)
+        
+        if not rows:
+            return
+
+        # Calculer la largeur max par colonne
+        num_cols = max(len(row) for row in rows)
+        col_widths = [0] * num_cols
+        
+        for row in rows:
+            for idx, cell in enumerate(row):
+                if idx < num_cols:
+                    # Ignorer la ligne de séparation pour le calcul de largeur (---)
+                    if set(cell) <= {'-', ':', ' '}: 
+                        continue
+                    col_widths[idx] = max(col_widths[idx], len(cell))
+        
+        # Construire les lignes formatées
+        for r_idx, row in enumerate(rows):
+            # Est-ce la ligne de séparation ?
+            is_separator = all(set(c) <= {'-', ':', ' '} for c in row) and len(row) > 0
+            
+            if is_separator:
+                # Créer une ligne de séparation jolie
+                sep_parts = []
+                for w in col_widths:
+                    sep_parts.append('─' * (w + 2))
+                formatted_line = "┼".join(sep_parts)
+                # Utiliser un style différent pour le séparateur
+                self.wiki_text.insert(tk.END, "  " + formatted_line + "\n", "code")
+                continue
+            
+            # Formater les cellules avec padding
+            formatted_cells = []
+            for c_idx, cell in enumerate(row):
+                if c_idx < len(col_widths):
+                    width = col_widths[c_idx]
+                    formatted_cells.append(f" {cell:<{width}} ") # Alignement gauche par défaut
+            
+            line_str = "│".join(formatted_cells)
+            
+            # Premier rang est le header
+            tag = "table_header" if r_idx == 0 else "table_row"
+            self.wiki_text.insert(tk.END, "  " + line_str + "\n", tag)
+
+    def _load_text_wiki(self, content):
+        """Charge et formate le contenu texte legacy du wiki"""
         lines = content.split('\n')
         for line in lines:
-            if line.startswith('🔥') or line.startswith('═══'):
-                self.wiki_text.insert(tk.END, line + '\n', "h1")
+            line = line.rstrip()
+            if line.startswith('🔥') or '════' in line:
+                clean = line.replace('════', '').strip()
+                if clean: self.wiki_text.insert(tk.END, clean + '\n', "h1")
             elif re.match(r'^\s*\d+\.\s+[A-ZÀ-ÖØ-Þ]', line) or line.strip().startswith("RÉFÉRENCES"):
                 self.wiki_text.insert(tk.END, line + '\n', "h2")
             elif re.match(r'^\s*\d+\.\d+', line):
                 self.wiki_text.insert(tk.END, line + '\n', "h3")
             elif line.strip().startswith('───'):
-                self.wiki_text.insert(tk.END, line + '\n', "h2")
-            elif '=' in line and ('q =' in line or 'Nu =' in line or 'Re =' in line or 'Pr =' in line or 'h_' in line or 'T_' in line or 'e_' in line):
-                self.wiki_text.insert(tk.END, line + '\n', "formula")
+                # Ignorer ou traiter comme séparateur
+                pass 
             elif line.strip().startswith(('⚠️', '💀', '🔥', '✅', '❌')):
                 self.wiki_text.insert(tk.END, line + '\n', "important")
-            elif line.strip().startswith(('┌', '├', '└', '│')):
+            elif '│' in line or '┌' in line: # Tableaux ASCII legacy
                 self.wiki_text.insert(tk.END, line + '\n', "code")
-            elif 'ÉTAPE' in line:
-                self.wiki_text.insert(tk.END, line + '\n', "h3")
             else:
                 self.wiki_text.insert(tk.END, line + '\n', "normal")
+
+
+
+    def open_wiki_at(self, search_text):
+        """Ouvre l'onglet Wiki et scrolle vers le texte spécifié"""
+        self.tabs.select(self.tab_wiki)
         
-        self.wiki_text.config(state=tk.DISABLED)
+        # Nettoyer les anciens highlights
+        self.wiki_text.tag_remove("highlight", "1.0", tk.END)
+        
+        # Chercher le texte (insensible à la casse)
+        pos = self.wiki_text.search(search_text, "1.0", stopindex=tk.END, nocase=True)
+        
+        if pos:
+            # Scroller vers la position
+            self.wiki_text.see(pos)
+            
+            # Mettre en évidence la ligne entière
+            line_end = f"{pos} lineend"
+            self.wiki_text.tag_add("highlight", pos, line_end)
+            
+            # Effet visuel temporaire (flash)
+            def flash(count):
+                if count % 2 == 0:
+                    self.wiki_text.tag_config("highlight", background=self.accent, foreground=self.bg_main)
+                else:
+                    self.wiki_text.tag_config("highlight", background="#3d3d00", foreground="#ffff00")
+                if count > 0:
+                    self.root.after(150, lambda: flash(count - 1))
+            
+            flash(6)
+        else:
+            print(f"Section wiki non trouvée: {search_text}")
 
     def wiki_search(self):
         """Recherche dans le wiki"""
@@ -5008,166 +4965,15 @@ class RocketApp:
         if not selection:
             return
         
-        item = self.wiki_toc.get(selection[0])
-        
-        # Extraire le numéro de section
-        section_map = {
-            # PARTIE 1 : LES BASES
-            "1.": "1. INTRODUCTION : LE PRINCIPE",
-            "2.": "2. LA TUYÈRE DE LAVAL",
-            "3.": "3. LE PROBLÈME THERMIQUE",
-            "4.": "4. LE REFROIDISSEMENT RÉGÉNÉRATIF",
-            # PARTIE 2 : THÉORIE AVANCÉE
-            "5.": "5. CHIMIE DE COMBUSTION",
-            "6.": "6. TRANSFERT THERMIQUE : L'ÉQUATION",
-            "7.": "7. DIMENSIONNEMENT DES CANAUX",
-            "8.": "8. MÉCANIQUE : CONTRAINTES",
-            # PARTIE 3 : MATÉRIAUX
-            "9.": "9. CRITÈRES DE SÉLECTION",
-            "10.": "10. BASE DE DONNÉES DÉTAILLÉE",
-            # PARTIE 4 : LOGICIEL
-            "11.": "11. UTILISATION DE L'OPTIMISEUR",
-            "12.": "12. EXPORT CAD",
-            # PARTIE 5 : DOCUMENTATION APPROFONDIE
-            "13.": "13. INTRODUCTION ET CONCEPTS",
-            "13.1": "13.1 POURQUOI LE REFROIDISSEMENT",
-            "13.2": "13.2 LES DIFFÉRENTES STRATÉGIES",
-            "13.3": "13.3 SCHÉMA DU TRANSFERT",
-            "13.4": "13.4 ÉQUATIONS FONDAMENTALES",
-            "13.5": "13.5 ORDRES DE GRANDEUR",
-            "14.": "14. THÉORIE DÉTAILLÉE",
-            "14.1": "14.1 LA CONDUCTION THERMIQUE",
-            "14.2": "14.2 LA CONVECTION THERMIQUE",
-            "14.3": "14.3 LES NOMBRES ADIMENSIONNELS",
-            "15.": "15. MODÈLE DE BARTZ",
-            "15.1": "15.1 HISTORIQUE",
-            "15.2": "15.2 ÉQUATION COMPLÈTE",
-            "15.3": "15.3 FORMULE SIMPLIFIÉE",
-            "15.4": "15.4 PROPRIÉTÉS DES GAZ",
-            "15.5": "15.5 VALEURS TYPIQUES DE h_g",
-            "15.6": "15.6 LIMITATIONS",
-            "15.7": "15.7 COMPARAISON",
-            "16.": "16. CALCUL DES TEMPÉRATURES",
-            "16.1": "16.1 SYSTÈME D'ÉQUATIONS",
-            "16.2": "16.2 CALCUL DE T_WALL_HOT",
-            "16.3": "16.3 CALCUL DE T_WALL_COLD",
-            "16.4": "16.4 PROFIL DE TEMPÉRATURE",
-            "16.5": "16.5 CONTRAINTES THERMIQUES",
-            "16.6": "16.6 RÉGIME TRANSITOIRE",
-            "16.7": "16.7 TEMPÉRATURE ADIABATIQUE",
-            "16.8": "16.8 CALCUL ITÉRATIF",
-            "17.": "17. CORRÉLATIONS CÔTÉ COOLANT",
-            "17.1": "17.1 CORRÉLATION DE DITTUS",
-            "17.2": "17.2 CORRÉLATION DE GNIELINSKI",
-            "17.3": "17.3 RÉGIME LAMINAIRE",
-            "17.4": "17.4 RÉGIME TRANSITOIRE",
-            "17.5": "17.5 ÉBULLITION SOUS-REFROIDIE",
-            "17.6": "17.6 EFFETS DE LA GÉOMÉTRIE",
-            "17.7": "17.7 PERTES DE CHARGE",
-            "17.8": "17.8 VALEURS TYPIQUES DE h_c",
-            "18.": "18. ÉPAISSEUR CRITIQUE",
-            "18.1": "18.1 ÉPAISSEUR CRITIQUE DE FUSION",
-            "18.2": "18.2 ÉPAISSEUR DE SERVICE",
-            "18.3": "18.3 PROCESSUS D'ABLATION",
-            "18.4": "18.4 ÉPAISSEUR SACRIFICIELLE",
-            "18.5": "18.5 TEMPS D'ABLATION",
-            "18.6": "18.6 QUAND L'ABLATION",
-            "18.7": "18.7 DIMENSIONNEMENT",
-            "18.8": "18.8 CARTE THERMIQUE",
-            "19.": "19. PROPRIÉTÉS DES MATÉRIAUX",
-            "19.1": "19.1 TABLEAU RÉCAPITULATIF",
-            "19.2": "19.2 ALLIAGES DE CUIVRE",
-            "19.3": "19.3 SUPERALLIAGES BASE NICKEL",
-            "19.4": "19.4 ALLIAGES D'ALUMINIUM",
-            "19.5": "19.5 MÉTAUX RÉFRACTAIRES",
-            "19.6": "19.6 MATÉRIAUX CÉRAMIQUES",
-            "19.7": "19.7 CRITÈRES DE SÉLECTION",
-            "19.8": "19.8 EXEMPLES DE MOTEURS",
-            "20.": "20. PROPRIÉTÉS DES COOLANTS",
-            "20.1": "20.1 TABLEAU RÉCAPITULATIF",
-            "20.2": "20.2 HYDROGÈNE LIQUIDE",
-            "20.3": "20.3 OXYGÈNE LIQUIDE",
-            "20.4": "20.4 MÉTHANE LIQUIDE",
-            "20.5": "20.5 RP-1",
-            "20.6": "20.6 ÉTHANOL",
-            "20.7": "20.7 HYDRAZINE",
-            "20.8": "20.8 EAU",
-            "20.9": "20.9 AMMONIAC",
-            "20.10": "20.10 COMPARAISON",
-            "20.11": "20.11 PROPRIÉTÉS EN FONCTION",
-            "21.": "21. EXEMPLES DE CALCUL",
-            "21.1": "21.1 EXEMPLE 1",
-            "21.2": "21.2 EXEMPLE 2",
-            "21.3": "21.3 EXEMPLE 3",
-            "21.4": "21.4 EXEMPLE 4",
-            "21.5": "21.5 EXEMPLE 5",
-            "21.6": "21.6 EXEMPLE 6",
-            "21.7": "21.7 TABLEAU RÉCAPITULATIF",
-            "21.8": "21.8 EXERCICES",
-            "22.": "22. FORMULES RAPIDES",
-            "22.1": "22.1 ÉQUATIONS FONDAMENTALES",
-            "22.2": "22.2 ÉQUATION DE BARTZ",
-            "22.3": "22.3 NOMBRES ADIMENSIONNELS",
-            "22.4": "22.4 CORRÉLATIONS DE CONVECTION",
-            "22.5": "22.5 ÉQUATIONS DE TEMPÉRATURE",
-            "22.6": "22.6 ÉPAISSEUR DE PAROI",
-            "22.7": "22.7 PUISSANCE ET ÉNERGIE",
-            "22.8": "22.8 PERTES DE CHARGE",
-            "22.9": "22.9 FILM COOLING",
-            "22.10": "22.10 PROPRIÉTÉS DES GAZ",
-            "22.11": "22.11 TABLEAU RÉCAPITULATIF",
-            "22.12": "22.12 ORDRES DE GRANDEUR",
-            "22.13": "22.13 CONVERSIONS",
-            "22.14": "22.14 CONSTANTES",
-            "23.": "23. CARTE THERMIQUE ET ANALYSE 2D/3D",
-            "23.1": "23.1 EFFET D'AILETTE",
-            "23.2": "23.2 INTERPOLATION THERMIQUE 2D",
-            "23.3": "23.3 VISUALISATIONS DISPONIBLES",
-            "24.": "24. EXPORT CAD ET GÉOMÉTRIE",
-            "24.1": "24.1 GÉNÉRATION DU PROFIL",
-            "24.2": "24.2 MODÉLISATION DES CANAUX",
-            "24.3": "24.3 FORMATS D'EXPORT",
-            "25.": "25. OPTIMISATION AUTOMATIQUE",
-            "25.1": "25.1 FONCTION OBJECTIF",
-            "25.2": "25.2 VARIABLES DE DÉCISION",
-            "25.3": "25.3 CONTRAINTES",
-            "25.4": "25.4 ALGORITHME SLSQP",
-            "26.": "26. ANALYSE DES CONTRAINTES MÉCANIQUES",
-            "26.1": "26.1 CONTRAINTES PRIMAIRES",
-            "26.2": "26.2 CONTRAINTES THERMIQUES",
-            "26.3": "26.3 CRITÈRE DE VON MISES",
-            "26.4": "26.4 FATIGUE OLIGOCYCLIQUE",
-            "27.": "27. SIMULATION TRANSITOIRE",
-            "27.1": "27.1 ÉQUATION DE LA CHALEUR",
-            "27.2": "27.2 STABILITÉ NUMÉRIQUE",
-            "27.3": "27.3 PHÉNOMÈNES TRANSITOIRES",
-            "Réf": "RÉFÉRENCES",
-            # Titres des PARTIES
-            "PARTIE 1": "PARTIE 1 : LES BASES",
-            "PARTIE 2": "PARTIE 2 : THÉORIE AVANCÉE",
-            "PARTIE 3": "PARTIE 3 : SCIENCE DES MATÉRIAUX",
-            "PARTIE 4": "PARTIE 4 : GUIDE DU LOGICIEL",
-            "PARTIE 5": "PARTIE 5 : DOCUMENTATION TECHNIQUE",
-        }
-        
-        # Chercher le texte correspondant
-        # Trier les clés par longueur décroissante pour que "3.1" soit testé avant "3."
-        search_text = None
-        item_stripped = item.strip()
-        
-        # Ignorer les lignes vides ou les séparateurs
-        if not item_stripped or item_stripped.startswith("════"):
-            return
-            
-        for key in sorted(section_map.keys(), key=len, reverse=True):
-            if item_stripped.startswith(key + " ") or item_stripped.startswith(key + ".") or item_stripped == key:
-                search_text = section_map[key]
-                break
-        
-        if search_text:
-            pos = self.wiki_text.search(search_text, "1.0", nocase=True)
-            if pos:
-                self.wiki_text.see(pos)
+        index = selection[0]
+        if hasattr(self, 'section_positions') and index in self.section_positions:
+            pos = self.section_positions[index]
+            self.wiki_text.see(pos)
+            self.wiki_text.tag_remove("highlight", "1.0", tk.END)
+            self.wiki_text.tag_add("highlight", pos, f"{pos} lineend")
+        else:
+            # Fallback legacy (si section_positions vide ou non init)
+            pass
 
     def load_database(self):
         """Charge tous les propergols depuis RocketCEA"""
@@ -7199,6 +7005,8 @@ Débit Oxydant   : {mdot_ox_available:.4f} kg/s
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    # Utiliser CustomTkinter comme fenêtre principale
+    root = ctk.CTk()
+    root.configure(fg_color="#0a0a0f")
     app = RocketApp(root)
     root.mainloop()

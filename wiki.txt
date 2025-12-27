@@ -1,8 +1,8 @@
-﻿🔥 GUIDE ULTIME DE CONCEPTION : SITH MISCHUNG COMBUSTION
+﻿ GUIDE ULTIME DE CONCEPTION : SITH MISCHUNG COMBUSTION
 ════════════════════════════════════════════════════════════════════
 Bienvenue dans la documentation officielle. Ce guide est structuré pour vous emmener du niveau "Débutant" au niveau "Ingénieur Aérospatial".
 
-📖 SOMMAIRE GÉNÉRAL
+ SOMMAIRE GÉNÉRAL
 ─────────────────────
 PARTIE 1 : LES BASES (Niveau Débutant)
    1. Introduction : Comment ça vole ?
@@ -45,7 +45,7 @@ C'est la 3ème loi de Newton : Pour chaque action, il y a une réaction égale e
 • La vitesse d'éjection (V_e) : Plus on jette la matière vite, plus on pousse fort.
 
 L'efficacité d'un moteur se mesure en ISP (Impulsion Spécifique).
-👉 Imaginez l'ISP comme la "consommation au 100km" de votre voiture, mais à l'envers. Plus l'ISP est haute, moins vous consommez pour la même poussée.
+-> Imaginez l'ISP comme la "consommation au 100km" de votre voiture, mais à l'envers. Plus l'ISP est haute, moins vous consommez pour la même poussée.
 
 2. LA TUYÈRE DE LAVAL : PASSER LE MUR DU SON
 ────────────────────────────────────────────────────────────────────
@@ -103,8 +103,8 @@ Pour estimer la chaleur qui attaque la paroi (h_g : coefficient de convection ga
 • σ : Facteur de correction de couche limite
 
 Ce que ça veut dire pour vous :
-👉 Plus la pression est haute, plus ça chauffe (exposant 0.8).
-👉 Plus le moteur est petit (petit diamètre Dt), plus ça chauffe ! (Les petits moteurs sont plus durs à refroidir).
+-> Plus la pression est haute, plus ça chauffe (exposant 0.8).
+-> Plus le moteur est petit (petit diamètre Dt), plus ça chauffe ! (Les petits moteurs sont plus durs à refroidir).
 
 7. DIMENSIONNEMENT DES CANAUX (SOLVEUR COOLANT)
 ────────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ L'objectif du solveur est de trouver l'épaisseur (e) et le coefficient du coola
 Pour le Coolant, on utilise souvent la corrélation de Dittus-Boelter ou Gnielinski :
    Nu = 0.023 * Re^0.8 * Pr^0.4
 
-👉 Astuce de design : Pour augmenter le refroidissement (h_c), il faut augmenter la vitesse du fluide. Pour cela, on réduit la taille des canaux (Hauteur/Largeur). Mais attention, cela augmente la pression nécessaire (Pertes de charge) !
+-> Astuce de design : Pour augmenter le refroidissement (h_c), il faut augmenter la vitesse du fluide. Pour cela, on réduit la taille des canaux (Hauteur/Largeur). Mais attention, cela augmente la pression nécessaire (Pertes de charge) !
 
 8. MÉCANIQUE : CONTRAINTES & PRESSION
 ────────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ B. La Chaleur (Contrainte Thermique) :
    • α : Coefficient de dilatation
    • ΔT : Différence de temp. entre face chaude et froide.
 
-👉 C'est souvent la contrainte thermique qui tue le moteur (fatigue oligocyclique), pas la pression. C'est pourquoi le Cuivre (qui réduit le ΔT grâce à sa conductivité) est meilleur que l'Acier, même si l'Acier est plus "solide".
+-> C'est souvent la contrainte thermique qui tue le moteur (fatigue oligocyclique), pas la pression. C'est pourquoi le Cuivre (qui réduit le ΔT grâce à sa conductivité) est meilleur que l'Acier, même si l'Acier est plus "solide".
 
 ════════════════════════════════════════════════════════════════════
    PARTIE 3 : SCIENCE DES MATÉRIAUX
@@ -192,14 +192,14 @@ Le logiciel génère des fichiers pour la CAO (Fusion 360, SolidWorks).
 • DXF : Exporte le profil 2D. Importez-le dans un "Sketch" et faites une "Révolution" (Revolve).
 • STL : Maillage triangulé. Utile pour l'impression 3D rapide ou le rendu visuel.
 
-⚠️ Note sur les canaux : Les canaux générés sont simplifiés (rectangulaires). Pour l'impression 3D, vous devrez peut-être ajouter des congés (fillets) ou modifier la forme pour qu'elle soit auto-portante (forme en goutte d'eau).
+**ATTENTION:** Note sur les canaux : Les canaux générés sont simplifiés (rectangulaires). Pour l'impression 3D, vous devrez peut-être ajouter des congés (fillets) ou modifier la forme pour qu'elle soit auto-portante (forme en goutte d'eau).
 
 ════════════════════════════════════════════════════════════════════
    PARTIE 5 : DOCUMENTATION TECHNIQUE APPROFONDIE
 ════════════════════════════════════════════════════════════════════
 "May the Thrust be with you."
 
-🔥 ANALYSE THERMIQUE DES MOTEURS-FUSÉES - GUIDE COMPLET
+ ANALYSE THERMIQUE DES MOTEURS-FUSÉES - GUIDE COMPLET
 ═══════════════════════════════════════════════════════════════
 
 Ce guide exhaustif couvre tous les aspects du refroidissement 
@@ -221,7 +221,7 @@ extrêmement élevées lors de la combustion:
   • Couple N2O4/UDMH:   T_c ≈ 3200-3400 K
   • Couple H2O2/RP-1:   T_c ≈ 2800-3000 K
 
-⚠️  PROBLÈME CRITIQUE:
+**ATTENTION:**  PROBLÈME CRITIQUE:
 Ces températures dépassent largement le point de fusion de TOUS 
 les métaux et alliages connus:
 
@@ -245,7 +245,7 @@ EXEMPLE NUMÉRIQUE - Temps avant fusion sans refroidissement:
   
   Temps: t = E/q = 10.3×10⁶ / 30×10⁶ = 0.34 seconde!
 
-💀 En moins d'une demi-seconde, la paroi atteint sa température 
+**DANGER:** En moins d'une demi-seconde, la paroi atteint sa température 
    de fusion sans refroidissement actif!
 
 
@@ -259,43 +259,43 @@ A) REFROIDISSEMENT RÉGÉNÉRATIF (traité dans ce guide)
    autour de la chambre AVANT d'être injecté et brûlé.
    
    Avantages:
-   ✅ Récupère l'énergie thermique (améliore Isp)
-   ✅ Pas de perte de masse propulsive
-   ✅ Permet fonctionnement continu longue durée
-   ✅ Contrôle précis des températures
+   + Récupère l'énergie thermique (améliore Isp)
+   + Pas de perte de masse propulsive
+   + Permet fonctionnement continu longue durée
+   + Contrôle précis des températures
    
    Inconvénients:
-   ❌ Complexité de fabrication (canaux, soudures)
-   ❌ Risque de cokéfaction avec hydrocarbures
-   ❌ Pertes de charge hydrauliques
-   ❌ Coût élevé de fabrication
+   - Complexité de fabrication (canaux, soudures)
+   - Risque de cokéfaction avec hydrocarbures
+   - Pertes de charge hydrauliques
+   - Coût élevé de fabrication
 
 B) REFROIDISSEMENT PAR FILM (Film Cooling)
    Une couche de propergol liquide ou gazeux est injectée 
    le long de la paroi, créant une barrière protectrice.
    
    Avantages:
-   ✅ Simple à implémenter
-   ✅ Réduit le flux thermique effectif
+   + Simple à implémenter
+   + Réduit le flux thermique effectif
    
    Inconvénients:
-   ❌ Perte d'Isp (propergol non brûlé de façon optimale)
-   ❌ Peut perturber la combustion
-   ❌ Efficacité limitée dans le temps
+   - Perte d'Isp (propergol non brûlé de façon optimale)
+   - Peut perturber la combustion
+   - Efficacité limitée dans le temps
 
 C) REFROIDISSEMENT ABLATIF
    La paroi est faite d'un matériau qui s'érode progressivement,
    absorbant l'énergie par changement de phase.
    
    Avantages:
-   ✅ Très simple (pas de circulation)
-   ✅ Léger pour moteurs à courte durée
-   ✅ Fiable (pas de pompes, pas de canaux)
+   + Très simple (pas de circulation)
+   + Léger pour moteurs à courte durée
+   + Fiable (pas de pompes, pas de canaux)
    
    Inconvénients:
-   ❌ Durée limitée
-   ❌ Changement de géométrie pendant le tir
-   ❌ Débris dans l'écoulement
+   - Durée limitée
+   - Changement de géométrie pendant le tir
+   - Débris dans l'écoulement
 
 D) REFROIDISSEMENT RADIATIF
    La paroi rayonne sa chaleur vers l'espace.
@@ -303,23 +303,23 @@ D) REFROIDISSEMENT RADIATIF
    spatiaux à faible poussée.
    
    Avantages:
-   ✅ Très simple, léger
-   ✅ Pas de fluide de refroidissement
+   + Très simple, léger
+   + Pas de fluide de refroidissement
    
    Inconvénients:
-   ❌ Limité aux faibles flux (< 5 MW/m²)
-   ❌ Nécessite matériaux réfractaires (Nb, Mo, W)
+   - Limité aux faibles flux (< 5 MW/m²)
+   - Nécessite matériaux réfractaires (Nb, Mo, W)
 
 E) TRANSPIRATION (Sweat Cooling)
    Le coolant suinte à travers un matériau poreux.
    
    Avantages:
-   ✅ Très efficace thermiquement
+   + Très efficace thermiquement
    
    Inconvénients:
-   ❌ Risque de bouchage des pores
-   ❌ Difficulté de fabrication
-   ❌ Rarement utilisé en pratique
+   - Risque de bouchage des pores
+   - Difficulté de fabrication
+   - Rarement utilisé en pratique
 
 
 13.3 SCHÉMA DU TRANSFERT THERMIQUE
@@ -612,7 +612,7 @@ CONVECTION FORCÉE:
 ÉBULLITION:
   Changement de phase liquide → vapeur.
   h peut atteindre 100,000+ W/m²·K
-  ⚠️ Éviter l'ébullition non contrôlée (DNB = crise d'ébullition)
+  **ATTENTION:** Éviter l'ébullition non contrôlée (DNB = crise d'ébullition)
 
 2.2.3 Couche limite thermique
 
@@ -973,7 +973,7 @@ FACTEURS INFLUENÇANT h_g:
 
 Le modèle de Bartz a des limitations importantes:
 
-❌ NE PREND PAS EN COMPTE:
+- NE PREND PAS EN COMPTE:
   - Rayonnement thermique (important si T > 3000 K)
   - Dissociation/recombinaison des gaz
   - Effets de couche limite réactive
@@ -982,12 +982,12 @@ Le modèle de Bartz a des limitations importantes:
   - Rugosité de surface
   - Dépôts de suie (cokéfaction)
 
-⚠️ PRÉCISION:
+**ATTENTION:** PRÉCISION:
   - Généralement ±20-30% pour h_g
   - Peut être pire dans des conditions extrêmes
   - Sous-estime parfois h_g au col
 
-✅ RECOMMANDATIONS:
++ RECOMMANDATIONS:
   - Utiliser des marges de sécurité (facteur 1.2-1.5)
   - Valider par essais si possible
   - Utiliser CFD pour conception détaillée
@@ -1102,7 +1102,7 @@ IMPORTANCE DE T_WALL_COLD:
   - Influence le stress thermique (dilatation différentielle)
   - Affecte les propriétés du coolant (ébullition possible?)
 
-⚠️ ATTENTION À L'ÉBULLITION:
+**ATTENTION:** ATTENTION À L'ÉBULLITION:
 Si T_wall_cold > T_ébullition du coolant (à la pression locale):
   → Formation de bulles
   → Risque de DNB (Departure from Nucleate Boiling)
@@ -1246,7 +1246,7 @@ IMPLICATIONS:
   - Pendant le transitoire, T_wall_hot peut DÉPASSER la valeur 
     en régime permanent (overshoot)!
 
-⚠️ RISQUE AU DÉMARRAGE:
+**ATTENTION:** RISQUE AU DÉMARRAGE:
 Le coolant peut ne pas être à plein débit quand les gaz 
 chauds arrivent → surchauffe critique possible!
 
@@ -1441,7 +1441,7 @@ Gnielinski est généralement plus précise (+/-10% vs +/-25%).
 5.3 RÉGIME LAMINAIRE (Re < 2300)
 ───────────────────────────────────────────────────────────────
 
-⚠️ À ÉVITER DANS LES MOTEURS-FUSÉES!
+**ATTENTION:** À ÉVITER DANS LES MOTEURS-FUSÉES!
 Le transfert thermique est très faible en laminaire.
 
 CAS DU FLUX CONSTANT:
@@ -1498,13 +1498,13 @@ Où S est un facteur de suppression tenant compte de la
 turbulence qui inhibe la nucléation.
 
 AVANTAGES:
-  ✅ h peut augmenter de 2 à 5 fois
-  ✅ Utilisé intentionnellement dans certains moteurs
+  + h peut augmenter de 2 à 5 fois
+  + Utilisé intentionnellement dans certains moteurs
 
 RISQUES:
-  ❌ Si T_bulk approche T_sat → ébullition en masse
-  ❌ DNB (Departure from Nucleate Boiling) → destruction
-  ❌ Instabilités hydrauliques possibles
+  - Si T_bulk approche T_sat → ébullition en masse
+  - DNB (Departure from Nucleate Boiling) → destruction
+  - Instabilités hydrauliques possibles
 
 
 5.6 EFFETS DE LA GÉOMÉTRIE DES CANAUX
@@ -1667,15 +1667,15 @@ FORMULE FINALE:
   └─────────────────────────────────────────────────────────┘
 
 INTERPRÉTATION:
-  - Si e < e_melt: la paroi NE FOND PAS ✅
+  - Si e < e_melt: la paroi NE FOND PAS +
   - Si e = e_melt: T_wall_hot = T_melt exactement (limite)
-  - Si e > e_melt: la surface FOND ❌
+  - Si e > e_melt: la surface FOND -
 
 FACTEURS FAVORABLES (e_melt élevé = plus de marge):
-  ✅ k élevé (bonne conductivité)
-  ✅ T_melt élevé (matériau réfractaire)
-  ✅ T_wall_cold bas (bon refroidissement)
-  ✅ q faible (position loin du col)
+  + k élevé (bonne conductivité)
+  + T_melt élevé (matériau réfractaire)
+  + T_wall_cold bas (bon refroidissement)
+  + q faible (position loin du col)
 
 EXEMPLE NUMÉRIQUE - CuCr:
   k = 320 W/m·K
@@ -1898,11 +1898,11 @@ CAS 2 - ABLATION TOLÉRÉE:
 
 CAS 3 - ABLATION CATASTROPHIQUE (à éviter!):
   ┌────────────────────────────────────────────────────────────┐
-  │ ❌ Percement de la paroi → fuite de gaz chauds             │
-  │ ❌ Contamination du coolant par métal fondu                │
-  │ ❌ Modification de la géométrie → perte de performances    │
-  │ ❌ Débris métalliques endommageant l'injecteur             │
-  │ ❌ Explosion possible!                                      │
+  │ - Percement de la paroi → fuite de gaz chauds             │
+  │ - Contamination du coolant par métal fondu                │
+  │ - Modification de la géométrie → perte de performances    │
+  │ - Débris métalliques endommageant l'injecteur             │
+  │ - Explosion possible!                                      │
   └────────────────────────────────────────────────────────────┘
 
 
@@ -2035,12 +2035,12 @@ A) CUIVRE PUR (Cu - C10200, OFHC)
     σ_yield @ 20°C = 70 MPa (très faible)
     σ_yield @ 500°C = 35 MPa
   
-  ✅ Avantages:
+  + Avantages:
     - Conductivité maximale
     - Facile à usiner
     - Bon marché
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Très faible résistance mécanique
     - Ramollit rapidement à T > 500 K
     - Fluage important
@@ -2063,13 +2063,13 @@ B) CUIVRE-CHROME (CuCr - C18200)
     E = 130 GPa
     α = 16.5 × 10⁻⁶ /K
   
-  ✅ Avantages:
+  + Avantages:
     - Excellent compromis k / résistance
     - Très bien maîtrisé industriellement
     - Soudable (TIG, EBW, FSW)
     - Disponible et économique
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Perd sa dureté si surchauffe > 800 K
     - Recristallisation possible
   
@@ -2095,12 +2095,12 @@ C) CUIVRE-CHROME-ZIRCONIUM (CuCrZr - C18150)
     σ_yield @ 20°C = 380-500 MPa
     σ_yield @ 600°C = 220 MPa
   
-  ✅ Avantages:
+  + Avantages:
     - Meilleure tenue à chaud que CuCr
     - Résistance au fluage améliorée
     - Zr stabilise les précipités de Cr
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Plus cher que CuCr
     - Traitement thermique critique
   
@@ -2121,13 +2121,13 @@ D) GRCop-84 (NASA Glenn Research Center)
     σ_yield @ 800°C = 150 MPa (EXCELLENT!)
     Résistance au fluage: 100× meilleure que CuCr
   
-  ✅ Avantages:
+  + Avantages:
     - Excellente résistance à haute T
     - Résistance au fluage exceptionnelle
     - Stable microstructuralement
     - Idéal pour impression 3D (SLM/DMLS)
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Développé par NASA, accès limité
     - Fabrication spécialisée
     - Plus cher
@@ -2175,13 +2175,13 @@ A) INCONEL 718
     σ_yield @ 650°C = 1000 MPa
     E = 200 GPa
   
-  ✅ Avantages:
+  + Avantages:
     - Excellente résistance mécanique
     - Bonne résistance à l'oxydation
     - Soudable
     - Bien maîtrisé pour impression 3D
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Conductivité très faible (11× moins que CuCr)
     - Limite thermique malgré T_melt élevé
     - Usinage difficile
@@ -2203,7 +2203,7 @@ B) INCONEL 625
     σ_yield @ 20°C = 460-760 MPa
     Excellente résistance à la corrosion
   
-  ✅ Avantages:
+  + Avantages:
     - Meilleure résistance corrosion que 718
     - Soudable sans traitement post-soudure
     - Bon pour environnements agressifs
@@ -2260,20 +2260,20 @@ A) AlSi10Mg (impression 3D)
     ρ = 2670 kg/m³ (léger!)
     σ_yield @ 20°C = 230-280 MPa (SLM)
   
-  ✅ Avantages:
+  + Avantages:
     - Très léger (3× moins que CuCr)
     - Excellente imprimabilité 3D
     - Conductivité correcte
     - Économique
     - Prototypage rapide
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - T_max TRÈS BASSE! (~300°C)
     - Fond facilement
     - Limité aux faibles flux
     - Résistance chute rapidement avec T
   
-  ⚠️ ATTENTION:
+  **ATTENTION:** ATTENTION:
     SEULEMENT pour moteurs faible pression/flux
     ou zones très bien refroidies!
   
@@ -2319,7 +2319,7 @@ A) NIOBIUM (Nb) et C103
     σ_yield @ 20°C = 310 MPa
     σ_yield @ 1200°C = 140 MPa
   
-  ⚠️ OXYDATION:
+  **ATTENTION:** OXYDATION:
     Nb s'oxyde catastrophiquement à T > 700 K dans l'air!
     → Utilisable uniquement dans le VIDE spatial
     → Ou avec revêtement siliciure (MoSi2, WSi2)
@@ -2350,7 +2350,7 @@ B) MOLYBDÈNE (Mo) et TZM
     σ_yield @ 20°C = 700 MPa
     σ_yield @ 1000°C = 420 MPa
   
-  ⚠️ OXYDATION:
+  **ATTENTION:** OXYDATION:
     Forme MoO3 volatil à T > 800 K dans l'air
     → "Peste du molybdène"
     → Vide ou atmosphère inerte obligatoire
@@ -2375,7 +2375,7 @@ C) TUNGSTÈNE (W) et W-Re
     Meilleure ductilité que W pur
     σ_yield @ 1500°C = 300 MPa
   
-  ⚠️ CARACTÉRISTIQUES:
+  **ATTENTION:** CARACTÉRISTIQUES:
     - Très fragile à température ambiante
     - DBTT (ductile-brittle) ≈ 400°C
     - Usinage très difficile (EDM)
@@ -2394,12 +2394,12 @@ D) RHÉNIUM (Re)
     T_max = 2600-2800 K
     ρ = 21020 kg/m³ (2ème plus dense)
   
-  ✅ Avantages:
+  + Avantages:
     - Ductile à toutes températures
     - Pas de DBTT comme W
     - Excellente résistance au fluage
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - EXTRÊMEMENT cher (~5000 $/kg)
     - Rare (production mondiale: 50 tonnes/an)
     - Lourd
@@ -2421,7 +2421,7 @@ A) GRAPHITE
     T_max = 3200-3500 K (vide)
     ρ = 1800-2200 kg/m³ (léger!)
   
-  ⚠️ OXYDATION:
+  **ATTENTION:** OXYDATION:
     Brûle à T > 700 K dans l'air!
     → Vide spatial uniquement
     → Ou revêtement SiC
@@ -2438,12 +2438,12 @@ B) COMPOSITE CARBONE-CARBONE (C/C)
     ρ = 1600-1900 kg/m³
     σ_tension = 200-400 MPa
   
-  ✅ Avantages:
+  + Avantages:
     - Très léger
     - k augmente avec T (!!)
     - Résistance maintenue à haute T
   
-  ❌ Inconvénients:
+  - Inconvénients:
     - Oxydation catastrophique si air
     - Fabrication longue et coûteuse
     - Anisotrope
@@ -2461,7 +2461,7 @@ C) CARBURE DE SILICIUM (SiC)
     T_max = 1900-2000 K
     ρ = 3210 kg/m³
   
-  ✅ Avantages:
+  + Avantages:
     - Résistant à l'oxydation
     - Dur et résistant à l'érosion
   
@@ -2621,20 +2621,20 @@ PROPRIÉTÉS DÉTAILLÉES:
   │ Chaleur latente        │ 448 kJ/kg                        │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES THERMIQUES:
++ AVANTAGES THERMIQUES:
   - Cp ÉNORME (14,300 J/kg·K) → absorbe beaucoup d'énergie
   - Viscosité très faible → Re élevé → h_c élevé
   - k/μ élevé → excellent transfert
   - h_c typique: 50,000-200,000 W/m²·K!
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Très basse température → isolation critique
   - Densité très faible → gros réservoirs
   - Fuit facilement (petite molécule)
   - Fragilisation hydrogène des métaux
   - Coût de production/stockage
 
-⚠️ PRÉCAUTIONS:
+**ATTENTION:** PRÉCAUTIONS:
   - Matériaux compatibles: Al, Inox 304/316, Inconel
   - Éviter: aciers au carbone (fragilisation)
   - Joints: PTFE, Indium, soudures
@@ -2670,18 +2670,18 @@ PROPRIÉTÉS DÉTAILLÉES:
   │ Chaleur latente        │ 213 kJ/kg                        │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Disponible (c'est l'oxydant!)
   - Bonne densité → compact
   - Température modérée (90 K vs 20 K pour LH2)
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Cp modéré seulement
   - TRÈS réactif → risques d'ignition
   - Incompatible avec hydrocarbures chauds
   - Corrosif à haute température
 
-⚠️ ATTENTION EXTRÊME:
+**ATTENTION:** ATTENTION EXTRÊME:
   - LOX + matière organique = EXPLOSION
   - Nettoyage LOX obligatoire (dégraissage)
   - Matériaux: Inox, Monel, Inconel
@@ -2714,7 +2714,7 @@ PROPRIÉTÉS DÉTAILLÉES:
   │ Chaleur latente        │ 510 kJ/kg                        │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Cp élevé (meilleur que RP-1)
   - Température modérée (112 K)
   - PAS DE COKÉFACTION! (propre)
@@ -2722,7 +2722,7 @@ PROPRIÉTÉS DÉTAILLÉES:
   - Densité acceptable
   - Viscosité faible → bon Re
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Moins dense que RP-1
   - Cryogénique (infrastructure)
   - Plage de T plus étroite que H2
@@ -2765,16 +2765,16 @@ PROPRIÉTÉS DÉTAILLÉES:
   │ Prandtl @ 400 K        │ 9                                │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Stockable à température ambiante!
   - Haute densité → réservoirs compacts
   - Infrastructure existante (aviation)
   - Non toxique (relativement)
   - Économique
 
-❌ INCONVÉNIENTS MAJEURS:
+- INCONVÉNIENTS MAJEURS:
 
-  ⚠️ COKÉFACTION (problème critique!):
+  **ATTENTION:** COKÉFACTION (problème critique!):
   
   À T > 450-500 K, le RP-1 se décompose et dépose du 
   carbone (coke) sur les parois des canaux:
@@ -2834,14 +2834,14 @@ PROPRIÉTÉS DÉTAILLÉES:
   │ Chaleur latente        │ 838 kJ/kg                        │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Stockable, non cryogénique
   - Non toxique, biodégradable
   - Bonne capacité de refroidissement
   - Peut contenir de l'eau (refroidissement film)
   - Production renouvelable possible
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Point d'ébullition bas (78°C)
   - Risque d'ébullition dans les canaux
   - Isp inférieure au RP-1
@@ -2861,7 +2861,7 @@ MOTEURS MODERNES:
 8.7 HYDRAZINE ET DÉRIVÉS (N2H4, MMH, UDMH)
 ───────────────────────────────────────────────────────────────
 
-⚠️ TOXIQUES ET DANGEREUX - Usage spatial principalement
+**ATTENTION:** TOXIQUES ET DANGEREUX - Usage spatial principalement
 
 A) HYDRAZINE (N2H4)
 
@@ -2877,8 +2877,8 @@ A) HYDRAZINE (N2H4)
   │ Viscosité              │ 0.97 mPa·s                       │
   └────────────────────────┴──────────────────────────────────┘
 
-  ✅ Avantages: Stockable, hypergolique avec N2O4
-  ❌ Inconvénients: TRÈS TOXIQUE, cancérigène
+  + Avantages: Stockable, hypergolique avec N2O4
+  - Inconvénients: TRÈS TOXIQUE, cancérigène
 
 B) MMH (Monométhylhydrazine - CH3NHNH2)
 
@@ -2925,14 +2925,14 @@ PROPRIÉTÉS:
   │ Chaleur latente        │ 2,257 kJ/kg (énorme!)            │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Cp très élevé (4,186 J/kg·K)
   - Conductivité excellente (0.60 W/m·K)
   - Chaleur latente énorme (ébullition = super refroidissement)
   - Non toxique, disponible
   - Économique
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Point d'ébullition bas (100°C @ 1 bar)
   - Gel à 0°C (problème spatial)
   - Corrosif si impuretés
@@ -2964,13 +2964,13 @@ PROPRIÉTÉS:
   │ Chaleur latente        │ 1,370 kJ/kg                      │
   └────────────────────────┴──────────────────────────────────┘
 
-✅ AVANTAGES:
++ AVANTAGES:
   - Cp élevé (4,700 J/kg·K)
   - Bonne conductivité
   - Stockable sous pression modérée
   - Utilisable comme propergol (avec décomposition)
 
-❌ INCONVÉNIENTS:
+- INCONVÉNIENTS:
   - Toxique (irritant)
   - Odeur forte
   - Corrosif pour cuivre et laiton
@@ -3173,7 +3173,7 @@ Facteur de correction σ (Bartz):
   
   h_g ≈ 7,020 W/m²·K
 
-  ⚠️ RÉSULTAT: h_g au col ≈ 7,000 W/m²·K
+  **ATTENTION:** RÉSULTAT: h_g au col ≈ 7,000 W/m²·K
 
 
 ÉTAPE 2 - CALCUL DU COEFFICIENT h_c (DITTUS-BOELTER)
@@ -3191,7 +3191,7 @@ Nombre de Reynolds:
   Re = 780 × 20 × 0.004 / (1.2×10⁻³)
   Re = 52,000
 
-  ✅ Re > 10,000 → Écoulement turbulent, Dittus-Boelter applicable
+  + Re > 10,000 → Écoulement turbulent, Dittus-Boelter applicable
 
 Nombre de Nusselt (Dittus-Boelter, chauffage):
   Nu = 0.023 × Re^0.8 × Pr^0.4
@@ -3204,7 +3204,7 @@ Coefficient de transfert:
   h_c = 549 × 0.11 / 0.004
   h_c = 15,100 W/m²·K
 
-  ⚠️ RÉSULTAT: h_c ≈ 15,100 W/m²·K
+  **ATTENTION:** RÉSULTAT: h_c ≈ 15,100 W/m²·K
 
 
 ÉTAPE 3 - CALCUL DU FLUX THERMIQUE ET TEMPÉRATURES
@@ -3229,12 +3229,12 @@ Flux thermique:
   q = 2612 / 2.19×10⁻⁴
   q = 11.93×10⁶ W/m²
   
-  ⚠️ RÉSULTAT: q ≈ 12 MW/m²
+  **ATTENTION:** RÉSULTAT: q ≈ 12 MW/m²
 
 Distribution des températures:
   T_wall_cold = T_coolant + q / h_c
   T_wall_cold = 300 + 11.93×10⁶ / 15,100
-  T_wall_cold = 300 + 790 = 1090 K   ❌ TROP ÉLEVÉ!
+  T_wall_cold = 300 + 790 = 1090 K   - TROP ÉLEVÉ!
 
   T_wall_hot = T_wall_cold + q × e / k
   T_wall_hot = 1090 + 11.93×10⁶ × 0.003 / 320
@@ -3244,7 +3244,7 @@ Distribution des températures:
 ÉTAPE 4 - ANALYSE ET ITÉRATION
 ─────────────────────────────
 
-⚠️ PROBLÈME DÉTECTÉ:
+**ATTENTION:** PROBLÈME DÉTECTÉ:
   T_wall_cold = 1090 K >> T_limite (723 K)
   La conception actuelle NE FONCTIONNE PAS!
 
@@ -3265,7 +3265,7 @@ ITÉRATION - Augmentation vitesse à 40 m/s:
   
   q = 2612 / 1.90×10⁻⁴ = 13.7 MW/m²
   
-  T_wall_cold = 300 + 13.7×10⁶ / 26,300 = 821 K   ❌ Encore trop!
+  T_wall_cold = 300 + 13.7×10⁶ / 26,300 = 821 K   - Encore trop!
 
 ITÉRATION - Avec refroidissement par film (15% fuel):
   Efficacité film: η_film ≈ 0.60
@@ -3274,10 +3274,10 @@ ITÉRATION - Avec refroidissement par film (15% fuel):
   
   q = (1867 - 300) / 1.90×10⁻⁴ = 8.2 MW/m²
   
-  T_wall_cold = 300 + 8.2×10⁶ / 26,300 = 612 K   ✅ OK!
-  T_wall_hot = 612 + 8.2×10⁶ × 0.003 / 320 = 689 K   ✅ OK!
+  T_wall_cold = 300 + 8.2×10⁶ / 26,300 = 612 K   + OK!
+  T_wall_hot = 612 + 8.2×10⁶ × 0.003 / 320 = 689 K   + OK!
 
-  ⚠️ SOLUTION: Vitesse 40 m/s + film cooling 15% → T_wall < T_limite
+  **ATTENTION:** SOLUTION: Vitesse 40 m/s + film cooling 15% → T_wall < T_limite
 
 
 ÉTAPE 5 - CALCUL ÉPAISSEUR CRITIQUE
@@ -3297,11 +3297,11 @@ Avec la configuration finale (v=40 m/s, film 15%):
   e_max = 320 × 111 / 8.2×10⁶
   e_max = 0.00433 m = 4.33 mm
 
-  ✅ Épaisseur 3 mm < e_max (4.33 mm) → Conception valide
+  + Épaisseur 3 mm < e_max (4.33 mm) → Conception valide
 
 Marge de sécurité sur épaisseur:
   Marge = (e_max - e_actuelle) / e_actuelle × 100
-  Marge = (4.33 - 3) / 3 × 100 = 44%   ✅ Marge acceptable
+  Marge = (4.33 - 3) / 3 × 100 = 44%   + Marge acceptable
 
 
 ÉTAPE 6 - RÉCAPITULATIF CONCEPTION FINALE
@@ -3424,7 +3424,7 @@ Coefficient de transfert:
   h_c = 1,183 × 0.12 / 0.00267
   h_c = 53,200 W/m²·K
 
-  ⚠️ RÉSULTAT: h_c ≈ 53,000 W/m²·K (excellent!)
+  **ATTENTION:** RÉSULTAT: h_c ≈ 53,000 W/m²·K (excellent!)
 
 
 ÉTAPE 3 - FLUX ET TEMPÉRATURES
@@ -3450,10 +3450,10 @@ Flux thermique:
   
   q = 3669 / 6.39×10⁻⁵ = 57.4 MW/m²
 
-  ⚠️ FLUX TRÈS ÉLEVÉ - typique des moteurs LOX/LH2
+  **ATTENTION:** FLUX TRÈS ÉLEVÉ - typique des moteurs LOX/LH2
 
 Températures paroi:
-  T_wall_cold = 100 + 57.4×10⁶ / 53,200 = 1,179 K   ❌ PROBLÈME!
+  T_wall_cold = 100 + 57.4×10⁶ / 53,200 = 1,179 K   - PROBLÈME!
   
   La température dépasse la limite (810 K) et même approche la fusion!
 
@@ -3466,7 +3466,7 @@ Le flux de 57 MW/m² est trop intense. Solutions:
 1. AUGMENTER LE NOMBRE DE CANAUX:
    N = 400 canaux → v = 99 m/s → Re = 2.17×10⁶
    Nu = 2,100 → h_c = 94,400 W/m²·K
-   T_wall_cold = 100 + 57.4×10⁶ / 94,400 = 708 K   ✅ OK!
+   T_wall_cold = 100 + 57.4×10⁶ / 94,400 = 708 K   + OK!
 
 2. OU RÉDUIRE LE DIAMÈTRE HYDRAULIQUE:
    Dh = 1.5 mm → Re augmente → h_c augmente
@@ -3475,7 +3475,7 @@ Le flux de 57 MW/m² est trop intense. Solutions:
    Film H2 5% → efficacité 0.40
    T_aw_eff = 100 + 0.40×(3769-100) = 1568 K
    q = (1568-100) / 6.39×10⁻⁵ = 23.0 MW/m²
-   T_wall_cold = 100 + 23.0×10⁶ / 53,200 = 533 K   ✅
+   T_wall_cold = 100 + 23.0×10⁶ / 53,200 = 533 K   +
 
 CONCEPTION FINALE RETENUE: 400 canaux
   ┌─────────────────────────────────────────────────────────┐
@@ -3486,11 +3486,11 @@ CONCEPTION FINALE RETENUE: 400 canaux
   │ Flux thermique:       50.2 MW/m² (avec 400 canaux)      │
   │ T_wall_cold:          632 K                             │
   │ T_wall_hot:           854 K                             │
-  │ Marge vs T_limite:    -44 K ❌ (besoin film cooling)    │
+  │ Marge vs T_limite:    -44 K - (besoin film cooling)    │
   │                                                         │
   │ AVEC FILM COOLING 3%:                                   │
   │ Flux effectif:        32 MW/m²                          │
-  │ T_wall_hot:           615 K   ✅                        │
+  │ T_wall_hot:           615 K   +                        │
   └─────────────────────────────────────────────────────────┘
 
 
@@ -3530,15 +3530,15 @@ Flux et températures:
   q = (3174 - 150) / 1.12×10⁻⁴ = 27.0 MW/m²
   
   T_wall_cold = 150 + 27.0×10⁶ / 92,500 = 442 K
-  T_wall_hot = 442 + 27.0×10⁶ × 0.002 / 42 = 1,728 K   ❌
+  T_wall_hot = 442 + 27.0×10⁶ × 0.002 / 42 = 1,728 K   -
 
-  ⚠️ Le niobium (T_fusion = 2750 K) supporte cette température, mais
+  **ATTENTION:** Le niobium (T_fusion = 2750 K) supporte cette température, mais
      la durée de vie serait limitée. Une liner en cuivre serait préférable.
 
 SOLUTION: Liner CuCrZr + coque Nb
   Liner 0.8 mm CuCrZr (k=320) + coque 2 mm Nb
   R_total = 1/18,500 + 0.0008/320 + 0.002/42 + 1/92,500 = 1.14×10⁻⁴
-  T_wall_hot = 150 + 27×10⁶ × (1/92,500 + 0.0008/320) = 511 K   ✅
+  T_wall_hot = 150 + 27×10⁶ × (1/92,500 + 0.0008/320) = 511 K   +
 
 
 9.4 EXEMPLE 4 : DIMENSIONNEMENT CANAUX DE REFROIDISSEMENT
@@ -3586,7 +3586,7 @@ MÉTHODE DE RÉSOLUTION:
    v = 2 / (80 × 750 × 4.5×10⁻⁶) = 7.4 m/s
    Re = 750 × 7.4 × 0.002 / 8×10⁻⁴ = 13,900
    Nu = 0.084 × 13,900^0.8 = 213
-   h_c = 213 × 0.10 / 0.002 = 10,650 W/m²·K   ❌ Trop bas!
+   h_c = 213 × 0.10 / 0.002 = 10,650 W/m²·K   - Trop bas!
 
    Essai N = 120, d = 1 mm, w = 2 mm:
    Dh = 4×2×1 / 6 = 1.33 mm
@@ -3594,13 +3594,13 @@ MÉTHODE DE RÉSOLUTION:
    v = 2 / (120 × 750 × 2×10⁻⁶) = 11.1 m/s
    Re = 750 × 11.1 × 0.00133 / 8×10⁻⁴ = 13,850
    Nu = 0.084 × 13,850^0.8 = 212
-   h_c = 212 × 0.10 / 0.00133 = 15,940 W/m²·K   ❌ Encore trop bas
+   h_c = 212 × 0.10 / 0.00133 = 15,940 W/m²·K   - Encore trop bas
 
    Essai N = 150, d = 0.8 mm, w = 1.6 mm (canaux fins):
    Dh = 4×1.6×0.8 / 4.8 = 1.07 mm
    v = 2 / (150 × 750 × 1.28×10⁻⁶) = 13.9 m/s
    Re = 750 × 13.9 × 0.00107 / 8×10⁻⁴ = 13,940
-   h_c = 14,000 W/m²·K   ❌
+   h_c = 14,000 W/m²·K   -
    
    PROBLÈME: avec RP-1, difficile d'atteindre h_c > 30,000 W/m²·K
    sans pertes de charge excessives.
@@ -3609,7 +3609,7 @@ MÉTHODE DE RÉSOLUTION:
    f = 0.316 / Re^0.25 = 0.316 / 13,940^0.25 = 0.029
    Δp = f × L/Dh × ρ × v² / 2
    Δp = 0.029 × 0.2/0.00107 × 750 × 13.9² / 2
-   Δp = 5.42 × 72,560 = 3.93 bar   ✅ OK
+   Δp = 5.42 × 72,560 = 3.93 bar   + OK
 
 CONCLUSION:
   h_c_max réaliste avec RP-1 ≈ 25,000 W/m²·K
@@ -3634,7 +3634,7 @@ CALCUL:
   ΔT_coolant = 850,000 / (2 × 2100)
   ΔT_coolant = 202 K
   
-  T_sortie = 300 + 202 = 502 K   ⚠️ > T_ébullition!
+  T_sortie = 300 + 202 = 502 K   **ATTENTION:** > T_ébullition!
 
 PROBLÈME: Le RP-1 risque de bouillir et former des dépôts (coking)
 
@@ -3647,7 +3647,7 @@ SOLUTIONS:
 AVEC FILM COOLING 20%:
   Q_effectif = 0.65 × 850 = 552 kW (réduction typique avec film)
   ΔT_coolant = 552,000 / (2 × 2100) = 132 K
-  T_sortie = 300 + 132 = 432 K   ✅ < T_ébullition
+  T_sortie = 300 + 132 = 432 K   + < T_ébullition
 
 
 9.6 EXEMPLE 6 : ANALYSE DIMENSIONNELLE RAPIDE
@@ -4540,7 +4540,7 @@ La face chaude veut se dilater mais est retenue par la face froide.
   - Face Chaude: COMPRESSION (σ < 0) car dilatation empêchée
   - Face Froide: TRACTION (σ > 0)
 
-  ⚠️ C'est souvent la contrainte dominante (peut dépasser 500 MPa)!
+  **ATTENTION:** C'est souvent la contrainte dominante (peut dépasser 500 MPa)!
 
 14.3 CRITÈRE DE VON MISES
 ───────────────────────────────────────────────────────────────
