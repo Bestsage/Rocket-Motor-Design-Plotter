@@ -4950,9 +4950,26 @@ class RocketApp:
         
         # Insérer le contenu avec formatage amélioré
         import re
+        
+        # Compiler les regex patterns une seule fois pour de meilleures performances
+        pattern_partie = re.compile(r'^\s*(PARTIE\s+\d+|RÉFÉRENCES)', re.IGNORECASE)
+        pattern_h2 = re.compile(r'^\d+\.\s+[A-ZÀ-ÖØ-Þ\(\)\']+')
+        pattern_h3 = re.compile(r'^\d+\.\d+\s+[A-ZÀ-ÖØ-Þ\(\)\']+')
+        pattern_h4_dot = re.compile(r'^[A-Z]\.\s+[A-Z]')
+        pattern_h4_paren = re.compile(r'^[A-Z]\)\s+[A-Z]')
+        pattern_important = re.compile(r'^\s*[💀❌]')
+        pattern_warning = re.compile(r'^\s*⚠️')
+        pattern_success = re.compile(r'^\s*[✅👉]')
+        pattern_bullet_emoji = re.compile(r'^\s*[🟢🔘⚪🟣🔴🟡🟤⚫🟠]')
+        pattern_bullet = re.compile(r'^\s*[•\-\*]\s+')
+        pattern_numbered = re.compile(r'^\s*\d+\.\s+[a-zà-ÿ]', re.IGNORECASE)
+        pattern_formula_var = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s*[=<>≈≤≥]')
+        pattern_formula_terms = re.compile(r'(q\s*=|Nu\s*=|Re\s*=|Pr\s*=|h_|T_|σ_|ΔT|MW/m)')
+        pattern_box_drawing = re.compile(r'^\s*[┌├└│┐┤┘─━═]')
+        
         lines = content.split('\n')
         
-        for i, line in enumerate(lines):
+        for line in lines:
             # Ligne vide - ajouter de l'espace
             if not line.strip():
                 self.wiki_text.insert(tk.END, '\n')
@@ -4967,12 +4984,12 @@ class RocketApp:
                 continue
             
             # Titres de parties (PARTIE 1, PARTIE 2, etc.)
-            if re.match(r'^\s*(PARTIE\s+\d+|RÉFÉRENCES)', line, re.IGNORECASE):
+            if pattern_partie.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "h1")
                 continue
             
             # Titres de niveau 2 : "13." ou "13. TITRE"
-            if re.match(r'^\d+\.\s+[A-ZÀ-ÖØ-Þ\(\)\']+', line):
+            if pattern_h2.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "h2")
                 continue
             
@@ -4982,48 +4999,48 @@ class RocketApp:
                 continue
             
             # Titres de niveau 3 : "13.1" ou "13.1 TITRE"
-            if re.match(r'^\d+\.\d+\s+[A-ZÀ-ÖØ-Þ\(\)\']+', line):
+            if pattern_h3.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "h3")
                 continue
             
             # Titres de niveau 4 : "A." ou "A) Titre"
-            if re.match(r'^[A-Z]\.\s+[A-Z]', line) or re.match(r'^[A-Z]\)\s+[A-Z]', line):
+            if pattern_h4_dot.match(line) or pattern_h4_paren.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "h4")
                 continue
             
-            # Avertissements importants (⚠️, 💀, ❌)
-            if re.match(r'^\s*[⚠️💀❌]', line.strip()):
-                self.wiki_text.insert(tk.END, line + '\n', "important")
-                continue
-            
-            # Warnings (note, attention)
-            if re.match(r'^\s*⚠️\s+', line):
+            # Warnings avec emoji ⚠️ (doit être avant important pour avoir priorité)
+            if pattern_warning.match(line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "warning")
                 continue
             
+            # Avertissements importants (💀, ❌)
+            if pattern_important.match(line.strip()):
+                self.wiki_text.insert(tk.END, line + '\n', "important")
+                continue
+            
             # Success / Checks (✅, 👉)
-            if re.match(r'^\s*[✅👉]', line.strip()):
+            if pattern_success.match(line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "success")
                 continue
             
             # Listes à puces avec emojis colorés (🟢, 🔘, ⚪, 🟣, etc.)
-            if re.match(r'^\s*[🟢🔘⚪🟣🔴🟡🟤⚫🟠]', line.strip()):
+            if pattern_bullet_emoji.match(line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "bullet_emoji")
                 continue
             
             # Listes à puces normales (•, -, *)
-            if re.match(r'^\s*[•\-\*]\s+', line):
+            if pattern_bullet.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "bullet")
                 continue
             
-            # Listes numérotées (1., 2., etc. au début de ligne avec espaces)
-            if re.match(r'^\s*\d+\.\s+[a-zà-ÿ]', line, re.IGNORECASE):
+            # Listes numérotées (1., 2., etc. - pour les listes minuscules uniquement)
+            # Note: Les titres majuscules ont déjà été attrapés par pattern_h2
+            if pattern_numbered.match(line):
                 self.wiki_text.insert(tk.END, line + '\n', "numbered_list")
                 continue
             
             # Formules mathématiques et équations (contient = avec variables)
-            if ('=' in line and re.search(r'[a-zA-Z_][a-zA-Z0-9_]*\s*[=<>≈≤≥]', line)) or \
-               re.search(r'(q\s*=|Nu\s*=|Re\s*=|Pr\s*=|h_|T_|σ_|ΔT|MW/m)', line):
+            if ('=' in line and pattern_formula_var.search(line)) or pattern_formula_terms.search(line):
                 self.wiki_text.insert(tk.END, line + '\n', "formula")
                 continue
             
@@ -5033,7 +5050,7 @@ class RocketApp:
                 continue
             
             # Box drawing characters (pour tableaux/diagrammes)
-            if re.match(r'^\s*[┌├└│┐┤┘─━═]', line.strip()):
+            if pattern_box_drawing.match(line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "code")
                 continue
             
