@@ -4976,6 +4976,9 @@ class RocketApp:
             self._load_text_wiki(content)
         
         self.wiki_text.config(state=tk.DISABLED)
+        
+        # Forcer la mise à jour du widget pour s'assurer qu'il prend toute la place disponible
+        self.wiki_text.update_idletasks()
     
     def _load_markdown_wiki(self, content):
         """Charge et formate le contenu Markdown du wiki"""
@@ -5238,6 +5241,13 @@ class RocketApp:
         if not pos:
             return
         
+        # S'assurer que le widget est à jour avant de scroller
+        self.wiki_text.update_idletasks()
+        
+        # Scroller vers la position
+        self.wiki_text.see(pos)
+        
+        # Calculer la fin de la ligne
         line_end = self.wiki_text.index(f"{pos} lineend")
         self.wiki_text.tag_remove("highlight", "1.0", tk.END)
         self.wiki_text.tag_add("highlight", pos, line_end)
