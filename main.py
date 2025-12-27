@@ -94,6 +94,25 @@ class RocketApp:
         self.results = {}
         self.geometry_profile = None  # Pour stocker X, Y du profil
         
+        # --- BASE DE DONNÉES MATÉRIAUX UNIFIÉE ---
+        self.materials_db = {
+            "Cuivre (Cu)": {"k": 385, "T_melt": 1358, "T_max": 1100, "rho": 8960, "E": 115, "nu": 0.34, "alpha": 17.0, "sigma_y": 220, "sigma_uts": 310, "color": "brown"},
+            "Cuivre-Chrome (CuCr)": {"k": 320, "T_melt": 1350, "T_max": 1050, "rho": 8900, "E": 118, "nu": 0.33, "alpha": 17.0, "sigma_y": 350, "sigma_uts": 420, "color": "peru"},
+            "Cuivre-Zirconium (CuZr)": {"k": 340, "T_melt": 1356, "T_max": 1000, "rho": 8920, "E": 120, "nu": 0.33, "alpha": 17.0, "sigma_y": 400, "sigma_uts": 480, "color": "peru"},
+            "AlSi10Mg (SLM)": {"k": 130, "T_melt": 870, "T_max": 573, "rho": 2670, "E": 70, "nu": 0.33, "alpha": 21.0, "sigma_y": 230, "sigma_uts": 350, "color": "silver"},
+            "Inconel 718": {"k": 11.4, "T_melt": 1609, "T_max": 1200, "rho": 8190, "E": 200, "nu": 0.29, "alpha": 13.0, "sigma_y": 1100, "sigma_uts": 1350, "color": "darkorange"},
+            "Inconel 625": {"k": 9.8, "T_melt": 1623, "T_max": 1250, "rho": 8440, "E": 208, "nu": 0.28, "alpha": 12.8, "sigma_y": 460, "sigma_uts": 830, "color": "orange"},
+            "Acier Inox 316L": {"k": 16.3, "T_melt": 1673, "T_max": 1100, "rho": 8000, "E": 193, "nu": 0.30, "alpha": 16.0, "sigma_y": 290, "sigma_uts": 580, "color": "gray"},
+            "Acier Inox 304": {"k": 16.2, "T_melt": 1723, "T_max": 1050, "rho": 7900, "E": 193, "nu": 0.29, "alpha": 17.2, "sigma_y": 215, "sigma_uts": 505, "color": "lightgray"},
+            "Niobium (Nb)": {"k": 53.7, "T_melt": 2750, "T_max": 2200, "rho": 8570, "E": 105, "nu": 0.40, "alpha": 7.3, "sigma_y": 207, "sigma_uts": 275, "color": "purple"},
+            "Molybdène (Mo)": {"k": 138, "T_melt": 2896, "T_max": 2400, "rho": 10280, "E": 329, "nu": 0.31, "alpha": 4.8, "sigma_y": 550, "sigma_uts": 700, "color": "darkgray"},
+            "Tungstène (W)": {"k": 173, "T_melt": 3695, "T_max": 3000, "rho": 19300, "E": 411, "nu": 0.28, "alpha": 4.5, "sigma_y": 550, "sigma_uts": 980, "color": "darkblue"},
+            "Titane Ti-6Al-4V": {"k": 6.7, "T_melt": 1933, "T_max": 700, "rho": 4430, "E": 114, "nu": 0.34, "alpha": 8.6, "sigma_y": 880, "sigma_uts": 950, "color": "lightblue"},
+            "Aluminium 6061": {"k": 167, "T_melt": 855, "T_max": 500, "rho": 2700, "E": 69, "nu": 0.33, "alpha": 23.6, "sigma_y": 276, "sigma_uts": 310, "color": "silver"},
+            "Graphite (C)": {"k": 120, "T_melt": 3900, "T_max": 3500, "rho": 2200, "E": 11, "nu": 0.20, "alpha": 4.0, "sigma_y": 30, "sigma_uts": 45, "color": "black"},
+            "Rhenium (Re)": {"k": 48, "T_melt": 3459, "T_max": 2800, "rho": 21020, "E": 463, "nu": 0.26, "alpha": 6.2, "sigma_y": 290, "sigma_uts": 490, "color": "darkred"},
+        }
+        
         style = ttk.Style()
         style.theme_use('clam')
         self.root.configure(bg=self.bg_main)
@@ -143,7 +162,6 @@ class RocketApp:
         self.tabs.pack(fill=tk.BOTH, expand=True)
         
         self.tab_summary = ttk.Frame(self.tabs)
-        self.tab_visu = ttk.Frame(self.tabs)
         self.tab_thermal = ttk.Frame(self.tabs)
         self.tab_heatmap = ttk.Frame(self.tabs)
         self.tab_cad = ttk.Frame(self.tabs)
@@ -157,10 +175,9 @@ class RocketApp:
         self.tab_wiki = ttk.Frame(self.tabs)
         
         self.tabs.add(self.tab_summary, text="📊 Résumé")
-        self.tabs.add(self.tab_visu, text="Visualisation 2D")
+        self.tabs.add(self.tab_cad, text="👁️ Visualisation & Export CAD")
         self.tabs.add(self.tab_thermal, text="Analyse Thermique (Bartz)")
         self.tabs.add(self.tab_heatmap, text="🔥 Carte Thermique")
-        self.tabs.add(self.tab_cad, text="🔧 Export CAD 3D")
         self.tabs.add(self.tab_optimizer, text="⚙️ Optimiseur")
         self.tabs.add(self.tab_stress, text="🛡️ Contraintes")
         self.tabs.add(self.tab_transient, text="⏱️ Transitoire")
@@ -175,7 +192,7 @@ class RocketApp:
         
         self.create_inputs(left_panel)
         self.init_summary_tab()
-        self.init_visu_tab()
+        self.init_cad_tab() # Contient maintenant la visu 2D et 3D
         self.init_thermal_tab()
         self.init_heatmap_tab()
         self.init_cad_tab()
@@ -521,14 +538,7 @@ class RocketApp:
             # Ligne normale
             self.txt_cea.insert(tk.END, line + '\n')
 
-    def init_visu_tab(self):
-        tk.Frame(self.tab_visu, height=4, bg=self.tab_accent.get("visu", self.accent_alt3)).pack(fill=tk.X)
-        self.fig_visu, self.ax_visu = plt.subplots(figsize=(5, 5))
-        self.fig_visu.patch.set_facecolor(self.bg_main)
-        self.apply_dark_axes(self.ax_visu)
-        self.canvas_visu = FigureCanvasTkAgg(self.fig_visu, master=self.tab_visu)
-        self.canvas_visu.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
-        self.canvas_visu.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
 
     def init_cea_tab(self):
         tk.Frame(self.tab_cea, height=4, bg=self.tab_accent.get("cea", self.accent_alt2)).pack(fill=tk.X)
@@ -1016,7 +1026,7 @@ class RocketApp:
         pass
 
     def init_cad_tab(self):
-        """Initialise l'onglet Export CAD 3D avec prévisualisation et canaux."""
+        """Initialise l'onglet Visualisation & Export CAD."""
         # Barre d'accent
         tk.Frame(self.tab_cad, height=4, bg="#9b59b6").pack(fill=tk.X)
         
@@ -1024,7 +1034,7 @@ class RocketApp:
         main_frame = ttk.Frame(self.tab_cad)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # Panneau de contrôles à gauche
+        # === Panneau de contrôles à gauche ===
         ctrl_panel = ttk.LabelFrame(main_frame, text="🔧 Configuration Export CAD 3D", padding=10)
         ctrl_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         
@@ -1100,7 +1110,7 @@ class RocketApp:
         btn_frame = ttk.Frame(ctrl_panel)
         btn_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(btn_frame, text="🔄 Prévisualiser", command=self.update_cad_preview).pack(fill=tk.X, pady=2)
+        ttk.Button(btn_frame, text="🔄 Prévisualiser 3D", command=self.update_cad_preview).pack(fill=tk.X, pady=2)
         ttk.Button(btn_frame, text="📐 Exporter STEP", command=self.export_step).pack(fill=tk.X, pady=2)
         ttk.Button(btn_frame, text="💾 Exporter STL", command=self.export_stl).pack(fill=tk.X, pady=2)
         ttk.Button(btn_frame, text="📏 Exporter DXF", command=self.export_dxf).pack(fill=tk.X, pady=2)
@@ -1118,21 +1128,39 @@ class RocketApp:
             lbl.grid(row=i, column=1, sticky="e", padx=10)
             self.cad_info_labels[key] = lbl
         
-        # Panneau de prévisualisation 3D à droite
-        preview_frame = ttk.LabelFrame(main_frame, text="🎨 Prévisualisation 3D", padding=5)
-        preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # === Panneau de visualisation à droite (Notebook) ===
+        vis_notebook = ttk.Notebook(main_frame)
+        vis_notebook.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        # Onglet 1: Profil 2D
+        tab_2d = ttk.Frame(vis_notebook)
+        vis_notebook.add(tab_2d, text="📐 Profil 2D")
+        
+        # Utiliser plt.Figure pour éviter les conflits avec le backend global
+        self.fig_visu = plt.Figure(figsize=(8, 6), dpi=100)
+        self.fig_visu.patch.set_facecolor(self.bg_main)
+        self.ax_visu = self.fig_visu.add_subplot(111)
+        self.apply_dark_axes(self.ax_visu)
+        
+        self.canvas_visu = FigureCanvasTkAgg(self.fig_visu, master=tab_2d)
+        self.canvas_visu.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
+        self.canvas_visu.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Onglet 2: Modèle 3D
+        tab_3d = ttk.Frame(vis_notebook)
+        vis_notebook.add(tab_3d, text="🧊 Modèle 3D")
         
         self.fig_cad = plt.Figure(figsize=(8, 6), dpi=100)
         self.fig_cad.patch.set_facecolor(self.bg_main)
         self.ax_cad = self.fig_cad.add_subplot(111, projection='3d')
         self.ax_cad.set_facecolor(self.bg_surface)
         
-        self.canvas_cad = FigureCanvasTkAgg(self.fig_cad, master=preview_frame)
+        self.canvas_cad = FigureCanvasTkAgg(self.fig_cad, master=tab_3d)
         self.canvas_cad.get_tk_widget().configure(bg=self.bg_main, highlightthickness=0)
         self.canvas_cad.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
-        # Message initial
-        self.ax_cad.text2D(0.5, 0.5, "Calculez d'abord le moteur\npuis cliquez sur Prévisualiser", 
+        # Message initial 3D
+        self.ax_cad.text2D(0.5, 0.5, "Calculez d'abord le moteur\npuis cliquez sur Prévisualiser 3D", 
                           transform=self.ax_cad.transAxes, ha='center', va='center', 
                           fontsize=12, color=self.text_muted)
 
@@ -1141,8 +1169,16 @@ class RocketApp:
         if not hasattr(self, 'ax_cad'):
             return
             
+        # Sauvegarder l'angle de vue actuel
+        elev = getattr(self.ax_cad, 'elev', None)
+        azim = getattr(self.ax_cad, 'azim', None)
+            
         self.fig_cad.clear()
         self.ax_cad = self.fig_cad.add_subplot(111, projection='3d')
+        
+        # Restaurer l'angle de vue
+        if elev is not None and azim is not None:
+            self.ax_cad.view_init(elev=elev, azim=azim)
         
         if not self.results or not self.geometry_profile:
             self.ax_cad.text2D(0.5, 0.5, "Calculez d'abord le moteur\n(bouton CALCULER)", 
@@ -1553,6 +1589,48 @@ class RocketApp:
         ttk.Label(header, text="Trouve la configuration optimale selon vos objectifs et contraintes",
                   foreground=self.text_muted).pack(side=tk.LEFT, padx=20)
         
+        # Section: Propriétés Matériau
+        mat_frame = ttk.LabelFrame(scroll_frame, text="🔩 Propriétés Matériau (Fixes)", padding=10)
+        mat_frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        row_mat = ttk.Frame(mat_frame)
+        row_mat.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(row_mat, text="Matériau:").pack(side=tk.LEFT)
+        self.optim_mat_combo = ttk.Combobox(row_mat, values=list(self.materials_db.keys()), state="readonly", width=25)
+        self.optim_mat_combo.set("Cuivre-Zirconium (CuZr)")
+        self.optim_mat_combo.pack(side=tk.LEFT, padx=10)
+        
+        self.optim_mat_props = {
+            "rho": tk.DoubleVar(value=8920),
+            "k": tk.DoubleVar(value=340),
+            "T_melt": tk.DoubleVar(value=1356),
+            "sigma_y": tk.DoubleVar(value=400)
+        }
+        
+        ttk.Label(row_mat, text="ρ (kg/m³):").pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Entry(row_mat, textvariable=self.optim_mat_props["rho"], width=8).pack(side=tk.LEFT)
+        
+        ttk.Label(row_mat, text="k (W/mK):").pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Entry(row_mat, textvariable=self.optim_mat_props["k"], width=8).pack(side=tk.LEFT)
+        
+        ttk.Label(row_mat, text="T_melt (K):").pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Entry(row_mat, textvariable=self.optim_mat_props["T_melt"], width=8).pack(side=tk.LEFT)
+        
+        ttk.Label(row_mat, text="σ_y (MPa):").pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Entry(row_mat, textvariable=self.optim_mat_props["sigma_y"], width=8).pack(side=tk.LEFT)
+        
+        def update_optim_material(event=None):
+            name = self.optim_mat_combo.get()
+            if name in self.materials_db:
+                mat = self.materials_db[name]
+                self.optim_mat_props["rho"].set(mat.get("rho", 8000))
+                self.optim_mat_props["k"].set(mat.get("k", 20))
+                self.optim_mat_props["T_melt"].set(mat.get("T_melt", 1500))
+                self.optim_mat_props["sigma_y"].set(mat.get("sigma_y", 200))
+        
+        self.optim_mat_combo.bind("<<ComboboxSelected>>", update_optim_material)
+        
         # Section: Objectif d'optimisation
         obj_frame = ttk.LabelFrame(scroll_frame, text="🎯 Objectif d'Optimisation", padding=10)
         obj_frame.pack(fill=tk.X, pady=5, padx=5)
@@ -1680,6 +1758,7 @@ class RocketApp:
         
         ttk.Button(action_frame, text="⏹ Arrêter", command=self.stop_optimization).pack(side=tk.LEFT, padx=5)
         ttk.Button(action_frame, text="📊 Exporter Résultats", command=self.export_optimization_results).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="📈 Visualiser", command=self.visualize_optimizer_results).pack(side=tk.LEFT, padx=5)
         ttk.Button(action_frame, text="📋 Appliquer Meilleur", command=self.apply_best_config).pack(side=tk.LEFT, padx=5)
         
         # Barre de progression
@@ -1819,6 +1898,67 @@ class RocketApp:
         try:
             # Point initial
             x0 = [(active_vars[k]["min"].get() + active_vars[k]["max"].get()) / 2 for k in var_keys]
+            n_vars = len(var_keys)
+            pop_size = int(self.optim_population.get())
+            
+            # Estimation du nombre total d'évaluations pour la barre de progression
+            if "Differential Evolution" in algorithm:
+                # (maxiter + 1) * popsize * N
+                total_evals = (max_iter + 1) * pop_size * n_vars
+            elif "Grid Search" in algorithm:
+                # Produit des pas
+                total_evals = 1
+                for key in var_keys:
+                    steps = int((active_vars[key]["max"].get() - active_vars[key]["min"].get()) / active_vars[key]["step"].get()) + 1
+                    total_evals *= steps
+            else:
+                # SLSQP, Nelder-Mead, etc. (difficile à prédire exactement, heuristique)
+                total_evals = max_iter * 5  # Heuristique
+            
+            total_evals = max(total_evals, 1) # Eviter div/0
+            
+            # Fonction wrapper pour mettre à jour la progression
+            def progress_callback(xk, convergence=None):
+                """Callback appelé par l'optimiseur à chaque itération (pas évaluation)."""
+                # Note: Scipy n'appelle ça qu'une fois par itération, pas par évaluation
+                # On utilise objective_function pour le vrai tracking
+                pass
+
+            def objective_function(x):
+                """Fonction objectif à minimiser."""
+                if self.optim_stop_flag:
+                    # Retourner une valeur haute pour forcer l'arrêt ou sortir
+                    # Scipy ne s'arrête pas immédiatement, mais on peut influencer
+                    return 1e9
+                
+                # Mapper x aux variables
+                config = {}
+                for i, key in enumerate(var_keys):
+                    config[key] = x[i]
+                
+                # Évaluer le design avec cette config
+                score, metrics = self._evaluate_design(config)
+                
+                # Stocker le résultat
+                self.optim_results_list.append({
+                    "config": config.copy(),
+                    "metrics": metrics,
+                    "score": score
+                })
+                
+                # Mettre à jour l'historique
+                self.optim_history.append(score)
+                
+                # Mise à jour UI (thread-safe)
+                # Calculer le progrès basé sur le nombre d'appels
+                n_calls = len(self.optim_results_list)
+                progress = min(99, (n_calls / total_evals) * 100)
+                
+                # Update moins fréquent pour ne pas spammer l'UI (tous les 1% ou 10 appels)
+                if n_calls % max(1, int(total_evals/100)) == 0:
+                    self.root.after(0, self._update_optim_progress, progress, score, config, metrics)
+                
+                return score
             
             if "Grid Search" in algorithm:
                 # Grid search
@@ -1827,27 +1967,32 @@ class RocketApp:
                 result = optimize.differential_evolution(
                     objective_function, bounds,
                     maxiter=max_iter,
-                    popsize=int(self.optim_population.get()),
+                    popsize=pop_size,
                     tol=float(self.optim_tolerance.get()),
                     workers=1,
-                    updating='deferred'
+                    updating='deferred',
+                    callback=progress_callback
                 )
             elif "SLSQP" in algorithm or "Gradient" in algorithm:
                 result = optimize.minimize(
                     objective_function, x0, method='SLSQP',
                     bounds=bounds,
-                    options={'maxiter': max_iter}
+                    options={'maxiter': max_iter},
+                    callback=progress_callback
                 )
             elif "Nelder-Mead" in algorithm:
                 result = optimize.minimize(
                     objective_function, x0, method='Nelder-Mead',
-                    options={'maxiter': max_iter}
+                    options={'maxiter': max_iter},
+                    callback=progress_callback
                 )
             else:
                 # Default to differential evolution
                 result = optimize.differential_evolution(
                     objective_function, bounds,
-                    maxiter=max_iter
+                    maxiter=max_iter,
+                    popsize=pop_size,
+                    callback=progress_callback
                 )
             
         except Exception as e:
@@ -1870,10 +2015,15 @@ class RocketApp:
         p_inlet = config.get("inlet_pressure", base_results.get("inlet_pressure_bar", 60.0))
         
         # === MODÈLE THERMIQUE AMÉLIORÉ ===
-        # Propriétés du matériau (depuis le solveur si disponible)
-        k_wall = base_results.get("wall_conductivity", 340)  # W/m.K CuZr par défaut
-        T_fusion = base_results.get("T_melt_material", 1356)  # K
-        rho_wall = base_results.get("wall_density", 8920)  # kg/m³ CuZr
+        # Propriétés du matériau (depuis l'interface Optimiseur)
+        if hasattr(self, 'optim_mat_props'):
+            k_wall = self.optim_mat_props["k"].get()
+            T_fusion = self.optim_mat_props["T_melt"].get()
+            rho_wall = self.optim_mat_props["rho"].get()
+        else:
+            k_wall = base_results.get("wall_conductivity", 340)
+            T_fusion = base_results.get("T_melt_material", 1356)
+            rho_wall = base_results.get("wall_density", 8920)
         
         # Flux thermique de base
         q_flux = base_results.get("q_flux_max", 10e6)  # W/m²
@@ -2192,6 +2342,119 @@ class RocketApp:
         else:
             messagebox.showinfo("Info", "Aucun paramètre correspondant trouvé dans l'interface.")
 
+    def visualize_optimizer_results(self):
+        """Affiche une visualisation graphique des résultats d'optimisation."""
+        if not hasattr(self, 'optim_results_list') or not self.optim_results_list:
+            messagebox.showwarning("Attention", "Pas de résultats d'optimisation à visualiser!")
+            return
+        
+        # Créer une fenêtre Toplevel
+        viz_window = tk.Toplevel(self.root)
+        viz_window.title("Analyse des Résultats d'Optimisation")
+        viz_window.geometry("900x750")
+        viz_window.configure(bg=self.bg_main)
+        
+        # Extraire les données
+        data = self.optim_results_list
+        scores = [d['score'] for d in data]
+        
+        # Identifier les variables qui ont varié
+        vars_keys = list(data[0]['config'].keys())
+        varied_vars = []
+        for key in vars_keys:
+            vals = [d['config'][key] for d in data]
+            if max(vals) - min(vals) > 1e-6:
+                varied_vars.append(key)
+        
+        if not varied_vars:
+            ttk.Label(viz_window, text="Aucune variation détectée dans les paramètres.").pack(pady=20)
+            return
+            
+        # Variables de métriques
+        metric_keys = list(data[0]['metrics'].keys())
+        # Filtrer les métriques numériques
+        metric_keys = [k for k in metric_keys if isinstance(data[0]['metrics'][k], (int, float))]
+        
+        # Contrôles
+        ctrl_frame = ttk.LabelFrame(viz_window, text="Paramètres du graphique", padding=10)
+        ctrl_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        row1 = ttk.Frame(ctrl_frame)
+        row1.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(row1, text="Axe X (Variable):").pack(side=tk.LEFT)
+        var_x = tk.StringVar(value=varied_vars[0])
+        cb_x = ttk.Combobox(row1, textvariable=var_x, values=varied_vars, state="readonly", width=20)
+        cb_x.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(row1, text="Axe Y (Métrique):").pack(side=tk.LEFT, padx=(15,0))
+        var_y = tk.StringVar(value="score")
+        cb_y = ttk.Combobox(row1, textvariable=var_y, values=["score"] + metric_keys, state="readonly", width=20)
+        cb_y.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(row1, text="Couleur (Métrique):").pack(side=tk.LEFT, padx=(15,0))
+        var_c = tk.StringVar(value="score")
+        cb_c = ttk.Combobox(row1, textvariable=var_c, values=["score"] + metric_keys, state="readonly", width=20)
+        cb_c.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(row1, text="🔄 Actualiser", command=lambda: update_plot()).pack(side=tk.RIGHT, padx=10)
+        
+        # Zone graphique
+        fig = plt.Figure(figsize=(8, 6), dpi=100)
+        fig.patch.set_facecolor(self.bg_main)
+        
+        canvas = FigureCanvasTkAgg(fig, master=viz_window)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        def update_plot(event=None):
+            # Nettoyer complètement la figure pour éviter les bugs de colorbar
+            fig.clear()
+            ax = fig.add_subplot(111)
+            self.apply_dark_axes(ax)
+            
+            x_key = var_x.get()
+            y_key = var_y.get()
+            c_key = var_c.get()
+            
+            # Récupérer les valeurs
+            X = [d['config'][x_key] for d in data]
+            
+            if y_key == "score":
+                Y = scores
+            else:
+                Y = [d['metrics'][y_key] for d in data]
+                
+            if c_key == "score":
+                C = scores
+            else:
+                C = [d['metrics'][c_key] for d in data]
+            
+            sc = ax.scatter(X, Y, c=C, cmap='viridis', s=50, alpha=0.8, edgecolors='none')
+            
+            ax.set_xlabel(x_key, color=self.text_primary)
+            ax.set_ylabel(y_key, color=self.text_primary)
+            ax.set_title(f"Optimisation: {y_key} vs {x_key}", color=self.text_primary)
+            
+            # Colorbar
+            cbar = fig.colorbar(sc, ax=ax, label=c_key)
+            cbar.ax.yaxis.label.set_color(self.text_primary)
+            cbar.ax.tick_params(colors=self.text_primary)
+            
+            # Mettre en évidence le meilleur point
+            best_idx = scores.index(min(scores))
+            ax.scatter([X[best_idx]], [Y[best_idx]], s=150, facecolors='none', edgecolors='red', linewidth=2, label="Meilleur")
+            ax.legend(facecolor=self.bg_surface, edgecolor=self.accent, labelcolor=self.text_primary)
+            
+            canvas.draw()
+        
+        # Bind events
+        cb_x.bind("<<ComboboxSelected>>", update_plot)
+        cb_y.bind("<<ComboboxSelected>>", update_plot)
+        cb_c.bind("<<ComboboxSelected>>", update_plot)
+        
+        # Initial plot
+        update_plot()
+
     # =====================================================================
     # ONGLET CONTRAINTES THERMOMÉCANIQUES
     # =====================================================================
@@ -2230,38 +2493,7 @@ class RocketApp:
         
         ttk.Label(row_mat, text="Matériau:").pack(side=tk.LEFT)
         # Matériaux identiques au solveur coolant avec propriétés mécaniques complètes
-        self.stress_materials_db = {
-            "Cuivre (Cu)": {"k": 385, "T_melt": 1358, "T_max": 1100, "rho": 8960,
-                           "E": 115, "nu": 0.34, "alpha": 17.0, "sigma_y": 220, "sigma_uts": 310},
-            "Cuivre-Chrome (CuCr)": {"k": 320, "T_melt": 1350, "T_max": 1050, "rho": 8900,
-                                     "E": 118, "nu": 0.33, "alpha": 17.0, "sigma_y": 350, "sigma_uts": 420},
-            "Cuivre-Zirconium (CuZr)": {"k": 340, "T_melt": 1356, "T_max": 1000, "rho": 8920,
-                                        "E": 120, "nu": 0.33, "alpha": 17.0, "sigma_y": 400, "sigma_uts": 480},
-            "AlSi10Mg (SLM)": {"k": 130, "T_melt": 870, "T_max": 573, "rho": 2670,
-                              "E": 70, "nu": 0.33, "alpha": 21.0, "sigma_y": 230, "sigma_uts": 350},
-            "Inconel 718": {"k": 11.4, "T_melt": 1609, "T_max": 1200, "rho": 8190,
-                           "E": 200, "nu": 0.29, "alpha": 13.0, "sigma_y": 1100, "sigma_uts": 1350},
-            "Inconel 625": {"k": 9.8, "T_melt": 1623, "T_max": 1250, "rho": 8440,
-                           "E": 208, "nu": 0.28, "alpha": 12.8, "sigma_y": 460, "sigma_uts": 830},
-            "Acier Inox 316L": {"k": 16.3, "T_melt": 1673, "T_max": 1100, "rho": 8000,
-                               "E": 193, "nu": 0.30, "alpha": 16.0, "sigma_y": 290, "sigma_uts": 580},
-            "Acier Inox 304": {"k": 16.2, "T_melt": 1723, "T_max": 1050, "rho": 7900,
-                              "E": 193, "nu": 0.29, "alpha": 17.2, "sigma_y": 215, "sigma_uts": 505},
-            "Niobium (Nb)": {"k": 53.7, "T_melt": 2750, "T_max": 2200, "rho": 8570,
-                            "E": 105, "nu": 0.40, "alpha": 7.3, "sigma_y": 207, "sigma_uts": 275},
-            "Molybdène (Mo)": {"k": 138, "T_melt": 2896, "T_max": 2400, "rho": 10280,
-                              "E": 329, "nu": 0.31, "alpha": 4.8, "sigma_y": 550, "sigma_uts": 700},
-            "Tungstène (W)": {"k": 173, "T_melt": 3695, "T_max": 3000, "rho": 19300,
-                             "E": 411, "nu": 0.28, "alpha": 4.5, "sigma_y": 550, "sigma_uts": 980},
-            "Titane Ti-6Al-4V": {"k": 6.7, "T_melt": 1933, "T_max": 700, "rho": 4430,
-                                "E": 114, "nu": 0.34, "alpha": 8.6, "sigma_y": 880, "sigma_uts": 950},
-            "Aluminium 6061": {"k": 167, "T_melt": 855, "T_max": 500, "rho": 2700,
-                              "E": 69, "nu": 0.33, "alpha": 23.6, "sigma_y": 276, "sigma_uts": 310},
-            "Graphite (C)": {"k": 120, "T_melt": 3900, "T_max": 3500, "rho": 2200,
-                            "E": 11, "nu": 0.20, "alpha": 4.0, "sigma_y": 30, "sigma_uts": 45},
-            "Rhenium (Re)": {"k": 48, "T_melt": 3459, "T_max": 2800, "rho": 21020,
-                            "E": 463, "nu": 0.26, "alpha": 6.2, "sigma_y": 290, "sigma_uts": 490},
-        }
+        self.stress_materials_db = self.materials_db
         self.stress_material = ttk.Combobox(row_mat, values=list(self.stress_materials_db.keys()), 
                                             state="readonly", width=25)
         self.stress_material.set("Cuivre-Zirconium (CuZr)")
@@ -3088,18 +3320,16 @@ class RocketApp:
         row4.pack(fill=tk.X, pady=2)
         
         ttk.Label(row4, text="Matériau Réf:").pack(side=tk.LEFT)
-        self.materials_ref = {
-            "Acier Inox 316L": {"k": 15, "t_melt": 1673, "color": "gray"},
-            "Inconel 625": {"k": 10, "t_melt": 1623, "color": "orange"},
-            "Inconel 718": {"k": 11.4, "t_melt": 1609, "color": "darkorange"},
-            "Cuivre C10200": {"k": 391, "t_melt": 1356, "color": "brown"},
-            "Cuivre-Chrome (CuCrZr)": {"k": 320, "t_melt": 1353, "color": "peru"},
-            "Aluminium 6061": {"k": 167, "t_melt": 855, "color": "silver"},
-            "Titane Ti-6Al-4V": {"k": 6.7, "t_melt": 1933, "color": "lightblue"},
-            "Hastelloy X": {"k": 9.1, "t_melt": 1628, "color": "green"},
-            "Niobium C103": {"k": 44, "t_melt": 2623, "color": "purple"},
-            "Tungstène": {"k": 173, "t_melt": 3695, "color": "darkblue"},
-        }
+        # Use unified database but map keys to format expected by graph logic if needed
+        # The unified DB keys are already descriptive
+        self.materials_ref = {}
+        for name, props in self.materials_db.items():
+            self.materials_ref[name] = {
+                "k": props["k"],
+                "t_melt": props["T_melt"],
+                "color": props.get("color", "blue")
+            }
+            
         self.combo_material = ttk.Combobox(row4, values=list(self.materials_ref.keys()), state="readonly", width=20)
         self.combo_material.current(0)
         self.combo_material.pack(side=tk.LEFT, padx=5)
@@ -3365,23 +3595,7 @@ class RocketApp:
         config_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         
         # Base de données des matériaux avec leurs propriétés
-        self.materials_db = {
-            "Cuivre (Cu)": {"k": 385, "T_melt": 1358, "T_max": 1100, "rho": 8960},
-            "Cuivre-Chrome (CuCr)": {"k": 320, "T_melt": 1350, "T_max": 1050, "rho": 8900},
-            "Cuivre-Zirconium (CuZr)": {"k": 340, "T_melt": 1356, "T_max": 1000, "rho": 8920},
-            "AlSi10Mg (SLM)": {"k": 130, "T_melt": 870, "T_max": 573, "rho": 2670},
-            "Inconel 718": {"k": 11.4, "T_melt": 1609, "T_max": 1200, "rho": 8190},
-            "Inconel 625": {"k": 9.8, "T_melt": 1623, "T_max": 1250, "rho": 8440},
-            "Acier Inox 316L": {"k": 16.3, "T_melt": 1673, "T_max": 1100, "rho": 8000},
-            "Acier Inox 304": {"k": 16.2, "T_melt": 1723, "T_max": 1050, "rho": 7900},
-            "Niobium (Nb)": {"k": 53.7, "T_melt": 2750, "T_max": 2200, "rho": 8570},
-            "Molybdène (Mo)": {"k": 138, "T_melt": 2896, "T_max": 2400, "rho": 10280},
-            "Tungstène (W)": {"k": 173, "T_melt": 3695, "T_max": 3000, "rho": 19300},
-            "Titane Ti-6Al-4V": {"k": 6.7, "T_melt": 1933, "T_max": 700, "rho": 4430},
-            "Aluminium 6061": {"k": 167, "T_melt": 855, "T_max": 500, "rho": 2700},
-            "Graphite (C)": {"k": 120, "T_melt": 3900, "T_max": 3500, "rho": 2200},
-            "Rhenium (Re)": {"k": 48, "T_melt": 3459, "T_max": 2800, "rho": 21020},
-        }
+        # Utilise la base unifiée définie dans __init__
         
         # Base de données des coolants - sera enrichie avec RocketCEA
         self.coolants_db = self.build_coolants_database()
@@ -5253,28 +5467,93 @@ class RocketApp:
             pe_psi = pe_des * 14.5038
             pamb_psi = pamb * 14.5038
             
-            # Init CEA
-            try:
-                ispObj = CEA_Obj(oxName=ox, fuelName=fuel)
-            except Exception as e:
-                raise ValueError(f"Ergols inconnus: {ox}/{fuel}\n{e}")
-            
-            # Calcul de eps
-            try:
-                eps = ispObj.get_eps_at_PcOvPe(Pc=pc_psi, MR=mr, PcOvPe=pc_psi/pe_psi)
-            except:
-                eps = 2.0  # Fallback
-            
-            # Performances
-            cstar_mps = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "C* (m/s)", debug=True)
-            if cstar_mps <= 1:
-                raise ValueError("C* nul. Vérifiez les ergols ou la pression.")
-            
-            isp_amb = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "ISP Ambiante (s)")
-            isp_vac = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "ISP Vide (s)")
-            tc_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Chambre (K)")
-            tt_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Col (K)")
-            te_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Sortie (K)")
+            # --- CEA LOGIC WITH FALLBACK ---
+            if HAS_ROCKETCEA:
+                # Init CEA
+                try:
+                    ispObj = CEA_Obj(oxName=ox, fuelName=fuel)
+                except Exception as e:
+                    raise ValueError(f"Ergols inconnus: {ox}/{fuel}\n{e}")
+                
+                # Calcul de eps
+                try:
+                    eps = ispObj.get_eps_at_PcOvPe(Pc=pc_psi, MR=mr, PcOvPe=pc_psi/pe_psi)
+                except:
+                    eps = 2.0  # Fallback
+                
+                # Performances
+                cstar_mps = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "C* (m/s)", debug=True)
+                if cstar_mps <= 1:
+                    raise ValueError("C* nul. Vérifiez les ergols ou la pression.")
+                
+                isp_amb = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "ISP Ambiante (s)")
+                isp_vac = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "ISP Vide (s)")
+                tc_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Chambre (K)")
+                tt_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Col (K)")
+                te_k = self.get_cea_value_safe(ispObj, pc_psi, mr, pe_psi, eps, pamb_psi, "Température Sortie (K)")
+                
+                # Propriétés de transport au col (pour Bartz)
+                try:
+                    transp = ispObj.get_Throat_Transport(Pc=pc_psi, MR=mr, eps=eps)
+                    # transp = [Cp, Mu, K, Pr]
+                    Cp_imp = transp[0]
+                    Mu_poise = transp[1] / 1000.0
+                    Pr = transp[3]
+                except:
+                    Cp_imp = 0.5
+                    Mu_poise = 0.001
+                    Pr = 0.7
+                    
+                # Conversion SI
+                Mu_si = Mu_poise * 0.1  # Pa.s
+                Cp_si = Cp_imp * 4186.8  # J/kg-K
+                
+            else:
+                # --- FALLBACK MODE (Gaz Parfait) ---
+                print("⚠️ Mode Fallback (Pas de RocketCEA)")
+                gamma = 1.2
+                MW = 24.0  # g/mol approx
+                R_univ = 8314.46
+                R_gas = R_univ / MW
+                
+                Tc_approx = 3300.0  # K approx
+                
+                # Pression ratio
+                pr = pe_des / pc
+                
+                # Mach sortie (Isentropique)
+                # pr = (1 + (g-1)/2 * M^2)^(-g/(g-1))
+                try:
+                    Me = math.sqrt(((pr ** (-(gamma-1)/gamma)) - 1) * 2 / (gamma - 1))
+                except:
+                    Me = 2.5
+                
+                # Eps (Area ratio)
+                # A/A* = 1/M * ((2 + (g-1)M^2)/(g+1))^((g+1)/(2(g-1)))
+                term = (2 + (gamma - 1) * Me**2) / (gamma + 1)
+                eps = (1 / Me) * (term ** ((gamma + 1) / (2 * (gamma - 1))))
+                
+                # C* approx
+                # C* = sqrt(R*Tc) / Gamma_func
+                Gamma_func = math.sqrt(gamma) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+                cstar_mps = math.sqrt(R_gas * Tc_approx) / Gamma_func
+                
+                # Isp approx
+                # Cf approx
+                cf_vac = Gamma_func * math.sqrt(2 * gamma / (gamma - 1) * (1 - pr ** ((gamma - 1) / gamma))) + eps * (pe_des - 0) / pc
+                cf_amb = cf_vac - eps * (pamb / pc)
+                
+                isp_vac = cstar_mps * cf_vac / 9.81
+                isp_amb = cstar_mps * cf_amb / 9.81
+                
+                tc_k = Tc_approx
+                tt_k = tc_k * (2 / (gamma + 1))
+                te_k = tc_k * (pr ** ((gamma - 1) / gamma))
+                
+                # Transport properties approx
+                Mu_si = 8.0e-5  # Pa.s (approx gaz chaud)
+                Cp_si = 2000.0  # J/kg-K
+                Pr = 0.8
             
             # Géométrie
             at_m2 = (mdot * cstar_mps) / (pc * 1e5)
@@ -5304,24 +5583,6 @@ class RocketApp:
                 "tc_k": tc_k, "tt_k": tt_k, "te_k": te_k,
                 "cstar_mps": cstar_mps
             }
-            
-            # --- ANALYSE THERMIQUE (BARTZ) ---
-            # Propriétés de transport au col
-            try:
-                transp = ispObj.get_Throat_Transport(Pc=pc_psi, MR=mr, eps=eps)
-                # transp = [Cp, Mu, K, Pr]
-                Cp_imp = transp[0]
-                Mu_poise = transp[1] / 1000.0
-                Pr = transp[3]
-            except:
-                # Valeurs par défaut approximatives
-                Cp_imp = 0.5
-                Mu_poise = 0.001
-                Pr = 0.7
-            
-            # Conversion SI
-            Mu_si = Mu_poise * 0.1  # Pa.s
-            Cp_si = Cp_imp * 4186.8  # J/kg-K
             
             # Stocker les propriétés transportées pour l'analyse paramétrique
             self.results["Mu"] = Mu_si
@@ -6051,6 +6312,29 @@ Débit Oxydant   : {mdot_ox_available:.4f} kg/s
             # Charger les résultats si disponibles
             if "_results" in design_data:
                 self.results = design_data["_results"]
+                
+                # Reconstruire le profil géométrique si disponible
+                if "thermal_profile" in self.results:
+                    try:
+                        X = np.array(self.results["thermal_profile"]["X_mm"])
+                        Y = np.array(self.results["thermal_profile"]["Y_mm"])
+                        self.geometry_profile = (X, Y)
+                        
+                        # Rafraîchir la visualisation 2D
+                        self.draw_engine(X, Y)
+                        
+                        # Rafraîchir le résumé
+                        # Note: On ne peut pas régénérer tout le texte coloré facilement sans recalculer
+                        # Mais on peut afficher un message
+                        self.txt_summary.config(state='normal')
+                        self.txt_summary.delete(1.0, tk.END)
+                        self.txt_summary.insert(tk.END, "✅ Paramètres et résultats chargés avec succès.\n\n", "success")
+                        self.txt_summary.insert(tk.END, "Visualisation 2D mise à jour.\n", "label")
+                        self.txt_summary.insert(tk.END, "Pour voir tous les détails et recalculer, cliquez sur 'CALCULER TOUT'.\n", "warning")
+                        self.txt_summary.config(state='disabled')
+                        
+                    except Exception as e:
+                        print(f"Erreur reconstruction géométrie: {e}")
             
             messagebox.showinfo("Succès", f"Paramètres chargés:\n{f}")
         except Exception as e:
