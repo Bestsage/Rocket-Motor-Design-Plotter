@@ -4905,16 +4905,26 @@ class RocketApp:
         self.wiki_text.config(yscrollcommand=scrollbar.set)
         self.wiki_text.pack(fill=tk.BOTH, expand=True)
         
-        # Configurer les tags de style
-        self.wiki_text.tag_configure("h1", font=("Segoe UI", 18, "bold"), foreground="#ff79c6", spacing3=10)
-        self.wiki_text.tag_configure("h2", font=("Segoe UI", 14, "bold"), foreground="#ffb86c", spacing1=15, spacing3=5)
-        self.wiki_text.tag_configure("h3", font=("Segoe UI", 12, "bold"), foreground="#8be9fd", spacing1=10, spacing3=3)
-        self.wiki_text.tag_configure("code", font=("Consolas", 10), background="#1a1a2e", foreground="#50fa7b")
-        self.wiki_text.tag_configure("formula", font=("Consolas", 11), foreground="#bd93f9")
-        self.wiki_text.tag_configure("important", foreground="#ff5555", font=("Consolas", 11, "bold"))
-        self.wiki_text.tag_configure("table_header", font=("Consolas", 10, "bold"), foreground="#8be9fd")
+        # Configurer les tags de style (améliorés pour meilleur rendu visuel)
+        self.wiki_text.tag_configure("h1", font=("Segoe UI", 20, "bold"), foreground="#ff79c6", spacing1=20, spacing3=15)
+        self.wiki_text.tag_configure("separator_main", font=("Consolas", 10), foreground="#ff79c6", spacing3=15)
+        self.wiki_text.tag_configure("h2", font=("Segoe UI", 15, "bold"), foreground="#ffb86c", spacing1=18, spacing3=8)
+        self.wiki_text.tag_configure("separator_h2", font=("Consolas", 10), foreground="#ffb86c", spacing3=8)
+        self.wiki_text.tag_configure("h3", font=("Segoe UI", 13, "bold"), foreground="#8be9fd", spacing1=12, spacing3=5)
+        self.wiki_text.tag_configure("separator_h3", font=("Consolas", 10), foreground="#8be9fd", spacing3=5)
+        self.wiki_text.tag_configure("h4", font=("Segoe UI", 12, "bold"), foreground="#bd93f9", spacing1=8, spacing3=3)
+        self.wiki_text.tag_configure("bullet", font=("Segoe UI", 11), foreground=self.text_primary, lmargin1=30, lmargin2=50, spacing1=2)
+        self.wiki_text.tag_configure("bullet_emoji", font=("Segoe UI", 11, "bold"), foreground="#50fa7b", lmargin1=30, lmargin2=50, spacing1=2)
+        self.wiki_text.tag_configure("numbered_list", font=("Segoe UI", 11), foreground=self.text_primary, lmargin1=30, lmargin2=50, spacing1=2)
+        self.wiki_text.tag_configure("code", font=("Consolas", 10), background="#1a1a2e", foreground="#50fa7b", lmargin1=40, lmargin2=40, spacing1=1)
+        self.wiki_text.tag_configure("formula", font=("Consolas", 11, "bold"), foreground="#bd93f9", background="#1a1a2e", lmargin1=40, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("important", foreground="#ff5555", font=("Segoe UI", 11, "bold"), lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("warning", foreground="#ffb347", font=("Segoe UI", 11, "bold"), background="#2a1a0a", lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("success", foreground="#50fa7b", font=("Segoe UI", 11, "bold"), lmargin1=20, lmargin2=40, spacing1=3, spacing3=3)
+        self.wiki_text.tag_configure("quote", font=("Segoe UI", 11, "italic"), foreground="#9fb4d3", lmargin1=50, lmargin2=50, spacing1=5, spacing3=5)
+        self.wiki_text.tag_configure("table_header", font=("Consolas", 10, "bold"), foreground="#8be9fd", background="#1a1a2e")
         self.wiki_text.tag_configure("highlight", background="#3d3d00", foreground="#ffff00")
-        self.wiki_text.tag_configure("normal", font=("Consolas", 11), foreground=self.text_primary)
+        self.wiki_text.tag_configure("normal", font=("Segoe UI", 11), foreground=self.text_primary, spacing1=2)
         
         # Variable pour la recherche
         self.wiki_search_pos = "1.0"
@@ -4923,7 +4933,7 @@ class RocketApp:
         self.load_wiki_content()
     
     def load_wiki_content(self):
-        """Charge le contenu du wiki depuis un fichier externe"""
+        """Charge le contenu du wiki depuis un fichier externe avec formatage amélioré"""
         self.wiki_text.config(state=tk.NORMAL)
         self.wiki_text.delete(1.0, tk.END)
         
@@ -4938,28 +4948,97 @@ class RocketApp:
         except Exception as e:
             content = f"Erreur lors du chargement du wiki: {str(e)}"
         
-        # Insérer le contenu avec formatage
+        # Insérer le contenu avec formatage amélioré
         import re
         lines = content.split('\n')
-        for line in lines:
-            if line.startswith('🔥') or line.startswith('═══'):
+        
+        for i, line in enumerate(lines):
+            # Ligne vide - ajouter de l'espace
+            if not line.strip():
+                self.wiki_text.insert(tk.END, '\n')
+                continue
+            
+            # Titre principal avec emoji feu ou double ligne ═══
+            if line.startswith('🔥') or (line.strip() and all(c in '═' for c in line.strip())):
+                if line.startswith('🔥'):
+                    self.wiki_text.insert(tk.END, line + '\n', "h1")
+                else:
+                    self.wiki_text.insert(tk.END, line + '\n', "separator_main")
+                continue
+            
+            # Titres de parties (PARTIE 1, PARTIE 2, etc.)
+            if re.match(r'^\s*(PARTIE\s+\d+|RÉFÉRENCES)', line, re.IGNORECASE):
                 self.wiki_text.insert(tk.END, line + '\n', "h1")
-            elif re.match(r'^\s*\d+\.\s+[A-ZÀ-ÖØ-Þ]', line) or line.strip().startswith("RÉFÉRENCES"):
+                continue
+            
+            # Titres de niveau 2 : "13." ou "13. TITRE"
+            if re.match(r'^\d+\.\s+[A-ZÀ-ÖØ-Þ\(\)\']+', line):
                 self.wiki_text.insert(tk.END, line + '\n', "h2")
-            elif re.match(r'^\s*\d+\.\d+', line):
+                continue
+            
+            # Séparateurs de niveau 2 (───)
+            if line.strip() and all(c in '─' for c in line.strip()):
+                self.wiki_text.insert(tk.END, line + '\n', "separator_h2")
+                continue
+            
+            # Titres de niveau 3 : "13.1" ou "13.1 TITRE"
+            if re.match(r'^\d+\.\d+\s+[A-ZÀ-ÖØ-Þ\(\)\']+', line):
                 self.wiki_text.insert(tk.END, line + '\n', "h3")
-            elif line.strip().startswith('───'):
-                self.wiki_text.insert(tk.END, line + '\n', "h2")
-            elif '=' in line and ('q =' in line or 'Nu =' in line or 'Re =' in line or 'Pr =' in line or 'h_' in line or 'T_' in line or 'e_' in line):
-                self.wiki_text.insert(tk.END, line + '\n', "formula")
-            elif line.strip().startswith(('⚠️', '💀', '🔥', '✅', '❌')):
+                continue
+            
+            # Titres de niveau 4 : "A." ou "A) Titre"
+            if re.match(r'^[A-Z]\.\s+[A-Z]', line) or re.match(r'^[A-Z]\)\s+[A-Z]', line):
+                self.wiki_text.insert(tk.END, line + '\n', "h4")
+                continue
+            
+            # Avertissements importants (⚠️, 💀, ❌)
+            if re.match(r'^\s*[⚠️💀❌]', line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "important")
-            elif line.strip().startswith(('┌', '├', '└', '│')):
+                continue
+            
+            # Warnings (note, attention)
+            if re.match(r'^\s*⚠️\s+', line):
+                self.wiki_text.insert(tk.END, line + '\n', "warning")
+                continue
+            
+            # Success / Checks (✅, 👉)
+            if re.match(r'^\s*[✅👉]', line.strip()):
+                self.wiki_text.insert(tk.END, line + '\n', "success")
+                continue
+            
+            # Listes à puces avec emojis colorés (🟢, 🔘, ⚪, 🟣, etc.)
+            if re.match(r'^\s*[🟢🔘⚪🟣🔴🟡🟤⚫🟠]', line.strip()):
+                self.wiki_text.insert(tk.END, line + '\n', "bullet_emoji")
+                continue
+            
+            # Listes à puces normales (•, -, *)
+            if re.match(r'^\s*[•\-\*]\s+', line):
+                self.wiki_text.insert(tk.END, line + '\n', "bullet")
+                continue
+            
+            # Listes numérotées (1., 2., etc. au début de ligne avec espaces)
+            if re.match(r'^\s*\d+\.\s+[a-zà-ÿ]', line, re.IGNORECASE):
+                self.wiki_text.insert(tk.END, line + '\n', "numbered_list")
+                continue
+            
+            # Formules mathématiques et équations (contient = avec variables)
+            if ('=' in line and re.search(r'[a-zA-Z_][a-zA-Z0-9_]*\s*[=<>≈≤≥]', line)) or \
+               re.search(r'(q\s*=|Nu\s*=|Re\s*=|Pr\s*=|h_|T_|σ_|ΔT|MW/m)', line):
+                self.wiki_text.insert(tk.END, line + '\n', "formula")
+                continue
+            
+            # Citations ou blocs de texte importants (commence par "  " ou indentation forte)
+            if line.startswith('   ') and not line.startswith('    •'):
+                self.wiki_text.insert(tk.END, line + '\n', "quote")
+                continue
+            
+            # Box drawing characters (pour tableaux/diagrammes)
+            if re.match(r'^\s*[┌├└│┐┤┘─━═]', line.strip()):
                 self.wiki_text.insert(tk.END, line + '\n', "code")
-            elif 'ÉTAPE' in line:
-                self.wiki_text.insert(tk.END, line + '\n', "h3")
-            else:
-                self.wiki_text.insert(tk.END, line + '\n', "normal")
+                continue
+            
+            # Ligne normale
+            self.wiki_text.insert(tk.END, line + '\n', "normal")
         
         self.wiki_text.config(state=tk.DISABLED)
 
