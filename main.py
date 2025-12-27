@@ -9,6 +9,7 @@ import numpy as np
 import math
 import json
 import os
+import re
 from datetime import datetime
 
 #this code only works with python 3.10 and below, 3.11, 3.13, and 3.14 dont support rocketcea.
@@ -4949,8 +4950,6 @@ class RocketApp:
             content = f"Erreur lors du chargement du wiki: {str(e)}"
         
         # Insérer le contenu avec formatage amélioré
-        import re
-        
         # Compiler les regex patterns une seule fois pour de meilleures performances
         pattern_partie = re.compile(r'^\s*(PARTIE\s+\d+|RÉFÉRENCES)', re.IGNORECASE)
         pattern_h2 = re.compile(r'^\d+\.\s+[A-ZÀ-ÖØ-Þ\(\)\']+')
@@ -5109,6 +5108,18 @@ class RocketApp:
             self.wiki_search_pos = "1.0"
             messagebox.showinfo("Recherche", f"Fin du document atteinte pour '{search_term}'")
     
+    def _highlight_wiki_line(self, pos, duration=2000):
+        """Highlight une ligne du wiki pour feedback visuel puis retire le highlight après un délai"""
+        if not pos:
+            return
+        
+        line_end = self.wiki_text.index(f"{pos} lineend")
+        self.wiki_text.tag_remove("highlight", "1.0", tk.END)
+        self.wiki_text.tag_add("highlight", pos, line_end)
+        
+        # Retirer le highlight après le délai spécifié
+        self.root.after(duration, lambda: self.wiki_text.tag_remove("highlight", "1.0", tk.END))
+    
     def wiki_goto_section(self, event):
         """Aller à une section du sommaire - Navigation améliorée avec support complet des sous-sections"""
         selection = self.wiki_toc.curselection()
@@ -5121,9 +5132,6 @@ class RocketApp:
         # Ignorer les lignes vides ou les séparateurs
         if not item_stripped or item_stripped.startswith("════"):
             return
-        
-        # Extraire le numéro de section du TOC item
-        import re
         
         # Pattern pour extraire le numéro (ex: "13.1" de "   13.1 Pourquoi refroidir ?")
         section_match = re.match(r'^\s*(\d+\.?\d*)\s+', item_stripped)
@@ -5141,14 +5149,9 @@ class RocketApp:
             if pos:
                 # Vérifier que c'est bien le début d'une ligne
                 line_start = self.wiki_text.index(f"{pos} linestart")
-                if line_start == pos or self.wiki_text.get(line_start, pos).strip() == "":
+                if line_start == pos:
                     self.wiki_text.see(pos)
-                    # Highlight la ligne brièvement pour feedback visuel
-                    line_end = self.wiki_text.index(f"{pos} lineend")
-                    self.wiki_text.tag_remove("highlight", "1.0", tk.END)
-                    self.wiki_text.tag_add("highlight", pos, line_end)
-                    # Retirer le highlight après 2 secondes
-                    self.root.after(2000, lambda: self.wiki_text.tag_remove("highlight", "1.0", tk.END))
+                    self._highlight_wiki_line(pos)
                     return
         
         # Fallback: recherche par texte partiel si le pattern numérique ne marche pas
@@ -5177,12 +5180,7 @@ class RocketApp:
             pos = self.wiki_text.search(term, "1.0", nocase=True)
             if pos:
                 self.wiki_text.see(pos)
-                # Highlight la ligne brièvement pour feedback visuel
-                line_end = self.wiki_text.index(f"{pos} lineend")
-                self.wiki_text.tag_remove("highlight", "1.0", tk.END)
-                self.wiki_text.tag_add("highlight", pos, line_end)
-                # Retirer le highlight après 2 secondes
-                self.root.after(2000, lambda: self.wiki_text.tag_remove("highlight", "1.0", tk.END))
+                self._highlight_wiki_line(pos)
                 return
 
     def load_database(self):
